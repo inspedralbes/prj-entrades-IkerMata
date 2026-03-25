@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\User;
 use App\Models\Esdeveniment;
 use App\Models\Sala;
-use App\Models\Sessions; // Wait, model is Sessio
 use App\Models\Sessio;
 use App\Models\CategoriaSeient;
 use App\Models\Seient;
@@ -17,66 +16,76 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Usuaris
         User::create([
-            'name' => 'Admin User',
+            'nom' => 'Admin User',
             'email' => 'admin@exemple.com',
             'password' => Hash::make('password'),
             'rol' => 'admin',
         ]);
 
         User::create([
-            'name' => 'Client User',
+            'nom' => 'Client User',
             'email' => 'client@exemple.com',
             'password' => Hash::make('password'),
             'rol' => 'client',
         ]);
 
-        // 2. Categories de Seients
         $catVip = CategoriaSeient::create(['nom' => 'VIP', 'color_hex' => '#FFD700']);
         $catGeneral = CategoriaSeient::create(['nom' => 'General', 'color_hex' => '#008000']);
 
-        // 3. Sala i Seients
-        $sala = Sala::create(['nom' => 'Sala Principal', 'capacitat' => 50]);
+        $salaPrincipal = Sala::create(['nom' => 'Sala 1', 'capacitat' => 50]);
+        $salaPetit = Sala::create(['nom' => 'Sala 2', 'capacitat' => 30]);
+        $salaGran = Sala::create(['nom' => 'Sala 3', 'capacitat' => 100]);
 
-        // Crear 5 files de 10 seients
-        foreach (range('A', 'E') as $fila) {
-            for ($num = 1; $num <= 10; $num++) {
-                Seient::create([
-                    'sala_id' => $sala->id,
-                    'fila' => $fila,
-                    'numero' => $num,
-                    'categoria_id' => ($fila === 'A') ? $catVip->id : $catGeneral->id,
-                ]);
+        $sales = [$salaPrincipal, $salaPetit, $salaGran];
+        foreach ($sales as $sala) {
+            $files = $sala->capacitat <= 30 ? 3 : ($sala->capacitat <= 50 ? 5 : 10);
+            $seientsPerFila = (int)($sala->capacitat / $files);
+            for ($f = 0; $f < $files; $f++) {
+                $fila = chr(65 + $f);
+                for ($num = 1; $num <= $seientsPerFila; $num++) {
+                    Seient::create([
+                        'sala_id' => $sala->id,
+                        'fila' => $fila,
+                        'numero' => $num,
+                        'categoria_id' => ($f === 0) ? $catVip->id : $catGeneral->id,
+                    ]);
+                }
             }
         }
 
-        // 4. Esdeveniment i Sessió
         $esdeveniment = Esdeveniment::create([
-            'titol' => 'Concert de Prova',
-            'descripcio' => 'Un concert espectacular per provar el sistema.',
+            'titol' => 'Dune: Part Two',
+            'descripcio' => 'Paul Atreides s\'uneix als Fremen mentre busca venganza contra els que van destruir a la seva familia.',
             'imatge_url' => 'https://via.placeholder.com/300',
-            'durada_minuts' => 120,
+            'durada_minuts' => 166,
             'estat' => 'actiu',
         ]);
 
-        $sessio = Sessio::create([
+        $sessio1 = Sessio::create([
             'esdeveniment_id' => $esdeveniment->id,
-            'sala_id' => $sala->id,
+            'sala_id' => $salaPrincipal->id,
             'data_hora' => now()->addDays(7),
         ]);
 
-        // 5. Preus per a la sessió
-        PreuSessio::create([
-            'sessio_id' => $sessio->id,
-            'categoria_id' => $catVip->id,
-            'preu' => 50.00,
+        $sessio2 = Sessio::create([
+            'esdeveniment_id' => $esdeveniment->id,
+            'sala_id' => $salaPetit->id,
+            'data_hora' => now()->addDays(14),
         ]);
 
-        PreuSessio::create([
-            'sessio_id' => $sessio->id,
-            'categoria_id' => $catGeneral->id,
-            'preu' => 25.00,
+        $sessio3 = Sessio::create([
+            'esdeveniment_id' => $esdeveniment->id,
+            'sala_id' => $salaGran->id,
+            'data_hora' => now()->addDays(21),
         ]);
+
+        foreach ([$sessio1, $sessio2, $sessio3] as $sessio) {
+            PreuSessio::create([
+                'sessio_id' => $sessio->id,
+                'categoria_id' => $catGeneral->id,
+                'preu' => 25.00,
+            ]);
+        }
     }
 }
