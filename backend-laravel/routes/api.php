@@ -2,15 +2,14 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Models\Peli;
 
-use App\Models\Esdeveniment;
-
-Route::get('/esdeveniments', function () {
-    return Esdeveniment::all()->map(function ($e) {
+Route::get('/peliculas', function () {
+    return Peli::all()->map(function ($p) {
         return [
-            'titol' => $e->titol,
-            'imatge_url' => $e->imatge_url,
-            'seats_available' => 45 // Mocked for now to match the "Seats available: 45" text in prompt
+            'titol' => $p->titol,
+            'imatge_url' => $p->imatge_url,
+            'seats_available' => 45 // En un futur es calcularà per sessió
         ];
     });
 });

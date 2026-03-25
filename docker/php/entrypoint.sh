@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 
 # Wait for database
 echo "Waiting for database..."
@@ -9,8 +9,8 @@ echo "Database is up!"
 
 # Run SQL init scripts
 echo "Running SQL scripts..."
-PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/sql/init.sql
-PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/sql/insert.sql || true
+PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/init.sql
+PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/insert.sql || true
 
 # Start php-fpm
 exec php-fpm

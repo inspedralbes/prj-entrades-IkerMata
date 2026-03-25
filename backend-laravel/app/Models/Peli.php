@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class Esdeveniment extends Model
+class Peli extends Model
 {
     use HasUuids;
+
+    protected $table = 'pelis';
 
     protected $fillable = ['uuid', 'titol', 'descripcio', 'imatge_url', 'durada_minuts', 'estat'];
 

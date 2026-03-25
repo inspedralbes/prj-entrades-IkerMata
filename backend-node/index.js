@@ -36,6 +36,15 @@ app.post('/api/reservar', async (req, res) => {
     }
 });
 
+app.get('/api/peliculas', async (req, res) => {
+    try {
+        const response = await axios.get(`${LARAVEL_API_URL}/pelis`);
+        res.status(response.status).json(response.data);
+    } catch (error) {
+        res.status(error.response?.status || 500).json(error.response?.data || { error: 'Internal Server Error' });
+    }
+});
+
 io.on('connection', (socket) => {
     console.log('a user connected');
     socket.on('disconnect', () => {

@@ -17,9 +17,9 @@ class Sessio extends Model
         return ['uuid'];
     }
 
-    public function esdeveniment()
+    public function peli()
     {
-        return $this->belongsTo(Esdeveniment::class);
+        return $this->belongsTo(Peli::class);
     }
 
     public function sala()
