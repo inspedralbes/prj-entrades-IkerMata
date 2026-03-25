@@ -1,0 +1,36 @@
+# Dependencies
+**/node_modules
+**/vendor
+
+# Env files
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Build artifacts
+**/dist
+**/.output
+**/.nuxt
+**/.next
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Laravel specific
+backend-laravel/storage/*.key
+backend-laravel/public/storage
+backend-laravel/public/hot
+backend-laravel/storage/framework/cache/data/*
+backend-laravel/storage/framework/views/*
+backend-laravel/storage/framework/sessions/*
+backend-laravel/storage/logs/*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+docker/data
