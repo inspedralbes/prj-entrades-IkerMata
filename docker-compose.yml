@@ -79,6 +79,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./base_de_dades/sql:/docker-entrypoint-initdb.d
     networks:
       - ticket-net
 

@@ -1,4 +1,4 @@
-#!/bin/sh
+﻿#!/bin/sh
 
 # Wait for database
 echo "Waiting for database..."
@@ -7,8 +7,10 @@ until nc -z db 5432; do
 done
 echo "Database is up!"
 
-# Run migrations and seed
-php artisan migrate --seed --force
+# Run SQL init scripts
+echo "Running SQL scripts..."
+PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/sql/init.sql
+PGPASSWORD=secret psql -v ON_ERROR_STOP=1 --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/sql/insert.sql || true
 
 # Start php-fpm
 exec php-fpm
