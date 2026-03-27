@@ -36,7 +36,7 @@ INSERT INTO sessions (id, uuid, esdeveniment_id, sala_id, data_hora) VALUES
 (1, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a20', 1, 1, '2026-04-01 20:00:00'),
 (2, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 2, 1, '2026-04-02 22:00:00'),
 (3, 'f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 3, 2, '2026-04-03 19:00:00'),
-(4, 'g6eebc99-9c0b-4ef8-bb6d-6bb9bd380a23', 4, 2, '2026-04-04 18:00:00');
+(4, 'g6eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 4, 2, '2026-04-04 18:00:00');
 
 -- Preus per sessio
 INSERT INTO preus_sessio (sessio_id, categoria_id, preu) VALUES
