@@ -9,7 +9,6 @@ const { data: movies, pending, error } = await useFetch('/peliculas', {
 
 <template>
   <div>
-    <Header />
     <main>
       <h1>Cartelera</h1>
       <div v-if="pending">Carregant...</div>

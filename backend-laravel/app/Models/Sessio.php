@@ -10,6 +10,8 @@ class Sessio extends Model
     use HasUuids;
 
     protected $table = 'sessions';
+    public $incrementing = true;
+    protected $keyType = 'int';
     protected $fillable = ['uuid', 'esdeveniment_id', 'sala_id', 'data_hora'];
 
     public function uniqueIds()
@@ -19,7 +21,7 @@ class Sessio extends Model
 
     public function peli()
     {
-        return $this->belongsTo(Peli::class);
+        return $this->belongsTo(Peli::class, 'esdeveniment_id');
     }
 
     public function sala()

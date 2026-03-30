@@ -10,6 +10,8 @@ class Peli extends Model
     use HasUuids;
 
     protected $table = 'pelis';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = ['uuid', 'titol', 'descripcio', 'imatge_url', 'durada_minuts', 'estat'];
 
@@ -20,6 +22,6 @@ class Peli extends Model
 
     public function sessions()
     {
-        return $this->hasMany(Sessio::class);
+        return $this->hasMany(Sessio::class, 'esdeveniment_id');
     }
 }

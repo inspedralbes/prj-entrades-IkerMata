@@ -18,6 +18,26 @@ Route::get('/peliculas', function () {
     });
 });
 
+Route::get('/peliculas/{id}', function ($id) {
+    $p = Peli::find($id);
+    if (!$p) return response()->json(['error' => 'Pelicula no encontrada'], 404);
+    return [
+        'id' => $p->id,
+        'titol' => $p->titol,
+        'imatge_url' => $p->imatge_url,
+        'descripcio' => $p->descripcio
+    ];
+});
+
+Route::get('/debug-sessions', function () {
+    return [
+        'pelis_count' => Peli::count(),
+        'sessions_count' => Sessio::count(),
+        'seients_count' => Seient::count(),
+        'all_sessions' => Sessio::all()
+    ];
+});
+
 Route::get('/peliculas/{id}/sesiones', function ($id) {
     return Sessio::where('esdeveniment_id', $id)->with('sala')->get()->map(function ($s) {
         return [
