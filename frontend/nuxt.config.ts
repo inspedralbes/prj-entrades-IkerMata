@@ -4,7 +4,17 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:8001/api'
+      apiBase: 'http://localhost:8001/api',
+      gatewayUrl: 'http://localhost:3003'
     }
+  },
+  routeRules: {
+    '/': { ssr: false },
+    '/sala': { ssr: false },
+    '/butaques': { ssr: false },
+    '/mis-entrades': { ssr: false },
+    '/pago': { ssr: false },
+    '/login': { ssr: false },
+    '/registre': { ssr: false }
   }
 })

@@ -1,11 +1,15 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CompraController;
+use App\Http\Controllers\EntradaController;
 use App\Models\Peli;
 use App\Models\Sessio;
 use App\Models\Seient;
-use App\Models\Sala;
+
+Route::post('/register', [AuthController::class, 'registrar']);
+Route::post('/login', [AuthController::class, 'login']);
 
 Route::get('/peliculas', function () {
     return Peli::all()->map(function ($p) {
@@ -20,7 +24,9 @@ Route::get('/peliculas', function () {
 
 Route::get('/peliculas/{id}', function ($id) {
     $p = Peli::find($id);
-    if (!$p) return response()->json(['error' => 'Pelicula no encontrada'], 404);
+    if (! $p) {
+        return response()->json(['error' => 'Pelicula no encontrada'], 404);
+    }
     return [
         'id' => $p->id,
         'titol' => $p->titol,
@@ -51,11 +57,15 @@ Route::get('/peliculas/{id}/sesiones', function ($id) {
 
 Route::get('/sesiones/{id}/asientos', function ($id) {
     $sessio = Sessio::find($id);
-    if (!$sessio) {
+    if (! $sessio) {
         return [];
     }
-    
-    $seients = Seient::where('sala_id', $sessio->sala_id)->with('categoria')->get();
+
+    $seients = Seient::where('sala_id', $sessio->sala_id)
+        ->with('categoria')
+        ->orderBy('fila')
+        ->orderBy('numero')
+        ->get();
 
     return $seients->map(function ($s) {
         return [
@@ -67,4 +77,12 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
             'reservat' => false
         ];
     });
+});
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/usuari', [AuthController::class, 'usuari']);
+    Route::get('/entrades', [EntradaController::class, 'indexAutenticat']);
+    Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
+    Route::post('/comprar', [CompraController::class, 'desar']);
 });

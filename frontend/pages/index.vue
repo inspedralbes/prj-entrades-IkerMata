@@ -1,9 +1,10 @@
 <script setup>
-const baseURL = process.client ? 'http://localhost:8001/api' : 'http://web/api'
+const baseURL = useApiBase()
 
-const { data: movies, pending, error } = await useFetch('/peliculas', { 
+const { data: movies, pending, error } = await useFetch('/peliculas', {
   baseURL,
-  timeout: 5000
+  timeout: 5000,
+  key: 'cartellera-peliculas'
 })
 </script>
 

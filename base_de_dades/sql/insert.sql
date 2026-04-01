@@ -1,35 +1,36 @@
 -- Dades inicials de exemple
 
 -- Netejar dades (OPCIONAL, però útil per reset)
-TRUNCATE users, categories_seients, sales, pelis, sessions, seients, preus_sessio CASCADE;
+TRUNCATE compres_entrades, reserves_temporals, personal_access_tokens, preus_sessio, seients, sessions, pelis, sales, categories_seients, users CASCADE;
 
--- Users de test
-INSERT INTO users (id, name, email, password, email_verified_at) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', NULL);
+-- Users de test (contrasenya: password)
+INSERT INTO users (id, nom, email, password, rol, email_verified_at) VALUES
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client', NULL);
 
--- Categories de seients
+-- Categories de seients (només VIP i Normal)
 INSERT INTO categories_seients (id, nom, color_hex) VALUES
 (1, 'VIP', '#FFD700'),
-(2, 'Platea', '#4169E1'),
-(3, 'General', '#228B22');
+(2, 'Normal', '#4169E1');
 
 -- Sales
 INSERT INTO sales (id, nom, capacitat) VALUES
-(1, 'Sala Principal', 100),
+(1, 'Sala Principal', 50),
 (2, 'Sala Petita', 50);
 
--- Seients Sala Principal (3 files x 10 seients)
+-- Seients Sala Principal (5 files A-E x 10 seients): només la 4a fila (D) és VIP
 INSERT INTO seients (id, sala_id, fila, numero, categoria_id) VALUES
-(1, 1, 'A', 1, 1), (2, 1, 'A', 2, 1), (3, 1, 'A', 3, 2), (4, 1, 'A', 4, 2), (5, 1, 'A', 5, 2), (6, 1, 'A', 6, 2), (7, 1, 'A', 7, 2), (8, 1, 'A', 8, 2), (9, 1, 'A', 9, 1), (10, 1, 'A', 10, 1),
-(11, 1, 'B', 1, 1), (12, 1, 'B', 2, 1), (13, 1, 'B', 3, 2), (14, 1, 'B', 4, 2), (15, 1, 'B', 5, 2), (16, 1, 'B', 6, 2), (17, 1, 'B', 7, 2), (18, 1, 'B', 8, 2), (19, 1, 'B', 9, 1), (20, 1, 'B', 10, 1),
-(21, 1, 'C', 1, 2), (22, 1, 'C', 2, 2), (23, 1, 'C', 3, 3), (24, 1, 'C', 4, 3), (25, 1, 'C', 5, 3), (26, 1, 'C', 6, 3), (27, 1, 'C', 7, 3), (28, 1, 'C', 8, 3), (29, 1, 'C', 9, 2), (30, 1, 'C', 10, 2);
+(1, 1, 'A', 1, 2), (2, 1, 'A', 2, 2), (3, 1, 'A', 3, 2), (4, 1, 'A', 4, 2), (5, 1, 'A', 5, 2), (6, 1, 'A', 6, 2), (7, 1, 'A', 7, 2), (8, 1, 'A', 8, 2), (9, 1, 'A', 9, 2), (10, 1, 'A', 10, 2),
+(11, 1, 'B', 1, 2), (12, 1, 'B', 2, 2), (13, 1, 'B', 3, 2), (14, 1, 'B', 4, 2), (15, 1, 'B', 5, 2), (16, 1, 'B', 6, 2), (17, 1, 'B', 7, 2), (18, 1, 'B', 8, 2), (19, 1, 'B', 9, 2), (20, 1, 'B', 10, 2),
+(21, 1, 'C', 1, 2), (22, 1, 'C', 2, 2), (23, 1, 'C', 3, 2), (24, 1, 'C', 4, 2), (25, 1, 'C', 5, 2), (26, 1, 'C', 6, 2), (27, 1, 'C', 7, 2), (28, 1, 'C', 8, 2), (29, 1, 'C', 9, 2), (30, 1, 'C', 10, 2),
+(31, 1, 'D', 1, 1), (32, 1, 'D', 2, 1), (33, 1, 'D', 3, 1), (34, 1, 'D', 4, 1), (35, 1, 'D', 5, 1), (36, 1, 'D', 6, 1), (37, 1, 'D', 7, 1), (38, 1, 'D', 8, 1), (39, 1, 'D', 9, 1), (40, 1, 'D', 10, 1),
+(41, 1, 'E', 1, 2), (42, 1, 'E', 2, 2), (43, 1, 'E', 3, 2), (44, 1, 'E', 4, 2), (45, 1, 'E', 5, 2), (46, 1, 'E', 6, 2), (47, 1, 'E', 7, 2), (48, 1, 'E', 8, 2), (49, 1, 'E', 9, 2), (50, 1, 'E', 10, 2);
 
 -- Pelicules
 INSERT INTO pelis (id, uuid, titol, descripcio, imatge_url, durada_minuts, estat) VALUES
-(1, 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'El Padrino', 'Saga mafiosa de Francis Ford Coppola', 'https://m.media-amazon.com/images/M/MV5BM2MyNjYxNmUtYTAwNi00MTYxLWJmNWYtYzZlODY3ZTk3OTFlXkEyXkFqcGdeQXVyNzkwMjQ5NzM@._V1_.jpg', 175, 'actiu'),
-(2, 'c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'Star Wars', 'Aventures a una galaxia molt llunyana', 'https://m.media-amazon.com/images/M/MV5BOTA5NjhiOTAtZWM0ZC00MWNhLWE1N2QtMDI4NWZkMWY0NGRhXkEyXkFqcGdeQXVyNDAzNDk0MTQ@._V1_.jpg', 121, 'actiu'),
-(3, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Inception', 'Somnis dins de somnis', 'https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_.jpg', 148, 'actiu'),
-(4, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', 'Titanic', 'Una historia de amor a l''Atlantic', 'https://m.media-amazon.com/images/M/MV5BMDdmZGU3NDQtY2E5My00ZTliLWIzOTUtOTU4Zjg3YjZlNWVjXkEyXkFqcGdeQXVyNTA4NzY1MzY@._V1_.jpg', 194, 'actiu');
+(1, 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'El Padrino', 'Saga mafiosa de Francis Ford Coppola', 'https://picsum.photos/seed/padrino/400/600', 175, 'actiu'),
+(2, 'c2eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'Star Wars', 'Aventures a una galaxia molt llunyana', 'https://picsum.photos/seed/starwars/400/600', 121, 'actiu'),
+(3, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Inception', 'Somnis dins de somnis', 'https://picsum.photos/seed/inception/400/600', 148, 'actiu'),
+(4, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', 'Titanic', 'Una historia de amor a l''Atlantic', 'https://picsum.photos/seed/titanic/400/600', 194, 'actiu');
 
 -- Sessions
 INSERT INTO sessions (id, uuid, esdeveniment_id, sala_id, data_hora) VALUES
@@ -38,12 +39,17 @@ INSERT INTO sessions (id, uuid, esdeveniment_id, sala_id, data_hora) VALUES
 (3, 'f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 3, 2, '2026-04-03 19:00:00'),
 (4, 'a6eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 4, 2, '2026-04-04 18:00:00');
 
--- Preus per sessio
+-- Preus per sessio (VIP i Normal)
 INSERT INTO preus_sessio (sessio_id, categoria_id, preu) VALUES
-(1, 1, 50.00), (1, 2, 35.00), (1, 3, 20.00),
-(2, 1, 50.00), (2, 2, 35.00), (2, 3, 20.00),
-(3, 1, 40.00), (3, 2, 25.00), (3, 3, 15.00),
-(4, 1, 45.00), (4, 2, 30.00), (4, 3, 18.00);
+(1, 1, 50.00), (1, 2, 20.00),
+(2, 1, 50.00), (2, 2, 20.00),
+(3, 1, 40.00), (3, 2, 15.00),
+(4, 1, 45.00), (4, 2, 18.00);
+
+-- Entrades comprades d'exemple (usuari de test)
+INSERT INTO compres_entrades (usuari_id, sessio_id, seient_id, preu_pagat) VALUES
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1, 5, 20.00),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1, 6, 20.00);
 
 -- Reset de les sequencies
 SELECT setval('pelis_id_seq', (SELECT max(id) FROM pelis));

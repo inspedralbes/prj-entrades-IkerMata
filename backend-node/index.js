@@ -45,6 +45,31 @@ app.get('/api/peliculas', async (req, res) => {
     }
 });
 
+// Compra d'entrades: reenvia el cos i el Bearer cap a Laravel
+app.post('/api/comprar', async (req, res) => {
+    try {
+        var cap = { 'Content-Type': 'application/json' };
+        if (req.headers.authorization) {
+            cap['Authorization'] = req.headers.authorization;
+        }
+        const response = await axios.post(`${LARAVEL_API_URL}/comprar`, req.body, {
+            headers: cap
+        });
+        if (response.status === 200 || response.status === 201) {
+            io.emit('compra-registrada', response.data);
+        }
+        res.status(response.status).json(response.data);
+    } catch (error) {
+        var status = 500;
+        var payload = { error: 'Internal Server Error' };
+        if (error.response) {
+            status = error.response.status;
+            payload = error.response.data;
+        }
+        res.status(status).json(payload);
+    }
+});
+
 io.on('connection', (socket) => {
     console.log('a user connected');
     socket.on('disconnect', () => {

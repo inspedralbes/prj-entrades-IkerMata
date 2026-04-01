@@ -31,7 +31,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $catVip = CategoriaSeient::create(['nom' => 'VIP', 'color_hex' => '#FFD700']);
-        $catGeneral = CategoriaSeient::create(['nom' => 'General', 'color_hex' => '#008000']);
+        $catNormal = CategoriaSeient::create(['nom' => 'Normal', 'color_hex' => '#4169E1']);
 
         $salaPrincipal = Sala::create(['nom' => 'Sala 1', 'capacitat' => 50]);
         $salaPetit = Sala::create(['nom' => 'Sala 2', 'capacitat' => 30]);
@@ -40,15 +40,17 @@ class DatabaseSeeder extends Seeder
         $sales = [$salaPrincipal, $salaPetit, $salaGran];
         foreach ($sales as $sala) {
             $files = $sala->capacitat <= 30 ? 3 : ($sala->capacitat <= 50 ? 5 : 10);
-            $seientsPerFila = (int)($sala->capacitat / $files);
+            $seientsPerFila = (int) ($sala->capacitat / $files);
             for ($f = 0; $f < $files; $f++) {
                 $fila = chr(65 + $f);
+                $esVip = $files >= 5 && $f === 3;
+
                 for ($num = 1; $num <= $seientsPerFila; $num++) {
                     Seient::create([
                         'sala_id' => $sala->id,
                         'fila' => $fila,
                         'numero' => $num,
-                        'categoria_id' => ($f === 0) ? $catVip->id : $catGeneral->id,
+                        'categoria_id' => $esVip ? $catVip->id : $catNormal->id,
                     ]);
                 }
             }
@@ -83,8 +85,13 @@ class DatabaseSeeder extends Seeder
         foreach ([$sessio1, $sessio2, $sessio3] as $sessio) {
             PreuSessio::create([
                 'sessio_id' => $sessio->id,
-                'categoria_id' => $catGeneral->id,
-                'preu' => 25.00,
+                'categoria_id' => $catVip->id,
+                'preu' => 50.00,
+            ]);
+            PreuSessio::create([
+                'sessio_id' => $sessio->id,
+                'categoria_id' => $catNormal->id,
+                'preu' => 20.00,
             ]);
         }
     }

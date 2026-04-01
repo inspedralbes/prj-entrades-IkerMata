@@ -2,14 +2,36 @@
 
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
+    nom VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    email_verified_at TIMESTAMP NULL,
     password VARCHAR(255) NOT NULL,
+    rol VARCHAR(20) NOT NULL DEFAULT 'client',
+    email_verified_at TIMESTAMP NULL,
     remember_token VARCHAR(100) NULL,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT users_rol_check CHECK (rol IN ('client', 'admin'))
 );
+
+-- Tokens API Laravel Sanctum (tokenable_id UUID per al model User)
+CREATE TABLE IF NOT EXISTS personal_access_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    tokenable_type VARCHAR(255) NOT NULL,
+    tokenable_id UUID NOT NULL,
+    name TEXT NOT NULL,
+    token VARCHAR(64) UNIQUE NOT NULL,
+    abilities TEXT NULL,
+    last_used_at TIMESTAMP NULL,
+    expires_at TIMESTAMP NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+);
+
+CREATE INDEX IF NOT EXISTS personal_access_tokens_tokenable_type_tokenable_id_index
+    ON personal_access_tokens (tokenable_type, tokenable_id);
+
+CREATE INDEX IF NOT EXISTS personal_access_tokens_expires_at_index
+    ON personal_access_tokens (expires_at);
 
 CREATE TABLE IF NOT EXISTS pelis (
     id SERIAL PRIMARY KEY,
@@ -87,5 +109,6 @@ CREATE TABLE IF NOT EXISTS compres_entrades (
     preu_pagat DECIMAL(10, 2) NOT NULL,
     data_compra TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (sessio_id, seient_id)
 );
