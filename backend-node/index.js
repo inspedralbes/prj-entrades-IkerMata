@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require("socket.io");
 const axios = require('axios');
 const cors = require('cors');
+const redisClient = require('./redisClient');
 
 const app = express();
 app.use(cors());
@@ -20,6 +21,16 @@ const LARAVEL_API_URL = process.env.LARAVEL_API_URL || 'http://web/api';
 
 app.get('/', (req, res) => {
     res.send('Gateway is running');
+});
+
+// Redis health check (infra)
+app.get('/health/redis', (req, res) => {
+    redisClient.pingRedis((err, pong) => {
+        if (err) {
+            return res.status(500).json({ ok: false, error: String(err.message || err) });
+        }
+        res.json({ ok: true, redis: pong });
+    });
 });
 
 // Proxy route example
