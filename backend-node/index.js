@@ -92,6 +92,27 @@ app.post('/api/register', function (req, res) {
         });
 });
 
+// Logout: reenvia el token a Laravel per tancar sessió
+app.post('/api/logout', function (req, res) {
+    var headers = {};
+    if (req.headers.authorization) {
+        headers['Authorization'] = req.headers.authorization;
+    }
+    axios.post(LARAVEL_API_URL + '/logout', {}, { headers: headers })
+        .then(function (response) {
+            res.status(response.status).json(response.data);
+        })
+        .catch(function (error) {
+            var status = 500;
+            var payload = { error: 'Internal Server Error' };
+            if (error.response) {
+                status = error.response.status;
+                payload = error.response.data;
+            }
+            res.status(status).json(payload);
+        });
+});
+
 // Compra d'entrades: reenvia el cos i el Bearer cap a Laravel
 app.post('/api/comprar', function (req, res) {
     var headers = { 'Content-Type': 'application/json' };
