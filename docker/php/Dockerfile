@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     libxml2-dev \
     zip \
     unzip \
-    postgresql-dev
+    postgresql-dev \
+    postgresql-client
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd

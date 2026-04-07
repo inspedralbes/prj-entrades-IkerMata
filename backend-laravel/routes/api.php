@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompraController;
@@ -10,6 +11,23 @@ use App\Models\Seient;
 
 Route::post('/register', [AuthController::class, 'registrar']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Redis health check — infra temps real (Agenttempsreal.md, tasca 1)
+Route::get('/health/redis', function () {
+    try {
+        $pong = Redis::connection()->ping();
+
+        return response()->json([
+            'ok' => true,
+            'redis' => $pong,
+        ]);
+    } catch (\Throwable $e) {
+        return response()->json([
+            'ok' => false,
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+});
 
 Route::get('/peliculas', function () {
     return Peli::all()->map(function ($p) {

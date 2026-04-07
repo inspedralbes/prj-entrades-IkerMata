@@ -6,21 +6,31 @@
 **/.env
 **/.env.local
 **/.env.*.local
+.env.backup
+.env.production
 
 # Build artifacts
 **/dist
 **/.output
 **/.nuxt
 **/.next
+**/public/build
+**/public/hot
 
 # OS files
 .DS_Store
 Thumbs.db
 
 # Laravel specific
+**/*.log
+.phpactor.json
+.phpunit.result.cache
+/.phpunit.cache
+/auth.json
+Homestead.json
+Homestead.yaml
 backend-laravel/storage/*.key
 backend-laravel/public/storage
-backend-laravel/public/hot
 backend-laravel/storage/framework/cache/data/*
 backend-laravel/storage/framework/views/*
 backend-laravel/storage/framework/sessions/*
@@ -29,6 +39,9 @@ backend-laravel/storage/logs/*
 # IDEs
 .vscode/
 .idea/
+.fleet
+.nova
+.zed
 *.swp
 *.swo
 
