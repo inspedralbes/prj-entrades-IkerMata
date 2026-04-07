@@ -80,4 +80,12 @@ class AutenticacioService
 
         return $usuari;
     }
+
+    /**
+     * Invalida tots els tokens de l'usuari (tanca sessió).
+     */
+    public function tancarSessio(User $usuari): void
+    {
+        $usuari->tokens()->delete();
+    }
 }

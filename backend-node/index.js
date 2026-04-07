@@ -94,15 +94,18 @@ app.post('/api/register', function (req, res) {
 
 // Logout: reenvia el token a Laravel per tancar sessió
 app.post('/api/logout', function (req, res) {
+    console.log('Gateway: Peticio de logout rebuda. Headers auth:', req.headers.authorization);
     var headers = {};
     if (req.headers.authorization) {
         headers['Authorization'] = req.headers.authorization;
     }
     axios.post(LARAVEL_API_URL + '/logout', {}, { headers: headers })
         .then(function (response) {
+            console.log('Gateway: Logout satisfactori en Laravel');
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
+            console.error('Gateway: Error en logout de Laravel:', error.response ? error.response.status : error.message);
             var status = 500;
             var payload = { error: 'Internal Server Error' };
             if (error.response) {

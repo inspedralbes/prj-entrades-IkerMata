@@ -39,11 +39,16 @@ export function useAuth() {
 
   async function logout() {
     var url = config.public.gatewayUrl + '/api/logout'
-    await $fetch(url, {
-      method: 'POST',
-      headers: capcalarsAutenticacio()
-    })
-    token.value = null
+    try {
+      await $fetch(url, {
+        method: 'POST',
+        headers: capcalarsAutenticacio()
+      })
+    } catch (e) {
+      console.error('Error enviant petició de logout al servidor:', e)
+    } finally {
+      token.value = null
+    }
   }
 
   return {

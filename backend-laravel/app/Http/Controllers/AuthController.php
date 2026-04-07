@@ -94,7 +94,7 @@ class AuthController extends Controller
             return response()->json(['missatge' => 'No autenticat'], 401);
         }
 
-        $usuari->tokens()->delete();
+        $this->autenticacioService->tancarSessio($usuari);
 
         return response()->json(['missatge' => 'Sessió tancada']);
     }
