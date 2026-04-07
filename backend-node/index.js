@@ -70,6 +70,28 @@ app.get('/api/peliculas', function (req, res) {
         });
 });
 
+// Login: reenvia credencials a Laravel
+app.post('/api/login', function (req, res) {
+    axios.post(LARAVEL_API_URL + '/login', req.body)
+        .then(function (response) {
+            res.status(response.status).json(response.data);
+        })
+        .catch(function (error) {
+            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+        });
+});
+
+// Register: reenvia dades a Laravel
+app.post('/api/register', function (req, res) {
+    axios.post(LARAVEL_API_URL + '/register', req.body)
+        .then(function (response) {
+            res.status(response.status).json(response.data);
+        })
+        .catch(function (error) {
+            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+        });
+});
+
 // Compra d'entrades: reenvia el cos i el Bearer cap a Laravel
 app.post('/api/comprar', function (req, res) {
     var headers = { 'Content-Type': 'application/json' };

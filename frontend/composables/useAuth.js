@@ -18,7 +18,7 @@ export function useAuth() {
   }
 
   async function login(email, password) {
-    var url = config.public.apiBase + '/login'
+    var url = config.public.gatewayUrl + '/api/login'
     var res = await $fetch(url, {
       method: 'POST',
       body: { email: email, password: password }
@@ -28,7 +28,7 @@ export function useAuth() {
   }
 
   async function registrar(nom, email, password) {
-    var url = config.public.apiBase + '/register'
+    var url = config.public.gatewayUrl + '/api/register'
     var res = await $fetch(url, {
       method: 'POST',
       body: { nom: nom, email: email, password: password }
@@ -38,7 +38,7 @@ export function useAuth() {
   }
 
   async function logout() {
-    var url = config.public.apiBase + '/logout'
+    var url = config.public.gatewayUrl + '/api/logout'
     await $fetch(url, {
       method: 'POST',
       headers: capcalarsAutenticacio()
