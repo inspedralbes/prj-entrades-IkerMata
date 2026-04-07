@@ -76,4 +76,54 @@ class CompraController extends Controller
 
         return response()->json($resultat, $codi);
     }
+
+    /**
+     * POST /api/reservar — crea o elimina una reserva temporal d'un seient.
+     */
+    public function reservarTemporal(Request $request): JsonResponse
+    {
+        $usuari = $request->user();
+        if ($usuari === null) {
+            return response()->json(['error' => 'Cal iniciar sessió'], 401);
+        }
+
+        $sessioId = $request->input('sessioId');
+        $seientId = $request->input('seientId');
+        $estat = $request->input('estat'); // true = reservar, false = alliberar
+
+        if (! $sessioId || ! $seientId) {
+            return response()->json(['error' => 'Faltes dades'], 422);
+        }
+
+        if ($estat) {
+            // Comprovar si ja està ocupat per algú altre
+            $existent = \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                ->where('seient_id', $seientId)
+                ->where('expires_at', '>', now())
+                ->where('usuari_id', '!=', $usuari->id)
+                ->exists();
+
+            if ($existent) {
+                return response()->json(['error' => 'Seient ja reservat per un altre usuari'], 409);
+            }
+
+            // Crear o renovar reserva
+            \App\Models\ReservaTemporal::updateOrCreate(
+                ['sessio_id' => $sessioId, 'seient_id' => $seientId, 'usuari_id' => $usuari->id],
+                ['expires_at' => now()->addMinutes(10)]
+            );
+
+            \App\Services\TempsRealService::notificarSeleccionat($sessioId, $seientId, (string)$usuari->id);
+            return response()->json(['ok' => true, 'missatge' => 'Seient reservat temporalment']);
+        } else {
+            // Alliberar reserva
+            \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                ->where('seient_id', $seientId)
+                ->where('usuari_id', $usuari->id)
+                ->delete();
+
+            \App\Services\TempsRealService::notificarAlliberat($sessioId, $seientId);
+            return response()->json(['ok' => true, 'missatge' => 'Reserva temporal lliure']);
+        }
+    }
 }

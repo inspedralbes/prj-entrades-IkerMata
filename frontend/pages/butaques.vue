@@ -5,24 +5,74 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
+const auth = useAuth()
+const { joinSessio, joinPelicula, socket } = useSocket()
 
 const peliId = route.query.peli
 const sessioId = route.query.sessio
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
-const { data: seients, pending: seatsLoading } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
+const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
   immediate: !!sessioId
 })
 
 const selectedSeients = ref([])
 
-function toggleSeient(seient) {
+onMounted(() => {
+  if (sessioId) {
+    joinSessio(sessioId)
+  }
+
+  socket.on('seient-seleccionat', (data) => {
+    if (data.sessio_id == sessioId && seients.value) {
+      const s = seients.value.find(s => s.id === data.seient_id)
+      if (s) {
+        if (data.usuari_id !== (auth.token.value ? '' : null)) { // Simplificació per demo
+           s.seleccionat_per_altre = true
+        }
+      }
+    }
+  })
+
+  socket.on('seient-alliberat', (data) => {
+    if (data.sessio_id == sessioId && seients.value) {
+      const s = seients.value.find(s => s.id === data.seient_id)
+      if (s) {
+        s.seleccionat_per_altre = false
+      }
+    }
+  })
+})
+
+async function toggleSeient(seient) {
   const index = selectedSeients.value.findIndex(s => s.id === seient.id)
-  if (index > -1) {
-    selectedSeients.value.splice(index, 1)
-  } else {
-    selectedSeients.value.push(seient)
+  const nouEstat = index === -1
+
+  try {
+    await $fetch(`${baseURL}/reservar`, {
+      method: 'POST',
+      headers: auth.capcalarsAutenticacio(),
+      body: {
+        sessioId: sessioId,
+        seientId: seient.id,
+        estat: nouEstat
+      }
+    })
+
+    if (nouEstat) {
+      selectedSeients.value.push(seient)
+    } else {
+      selectedSeients.value.splice(index, 1)
+    }
+  } catch (e) {
+    if (e.response && e.response.status === 401) {
+      await auth.logout()
+      navigateTo('/login')
+    } else {
+      alert(e.data?.error || 'No s\'ha pogut reservar el seient')
+      refreshSeats()
+    }
   }
 }
 
@@ -83,10 +133,11 @@ watch(
               class="seient"
               :class="{
                 selected: selectedSeients.some(s => s.id === seient.id),
-                reservat: seient.reservat
+                reservat: seient.reservat,
+                'other-selected': seient.seleccionat_per_altre
               }"
               :style="{ backgroundColor: seient.color }"
-              @click="!seient.reservat && toggleSeient(seient)"
+              @click="!seient.reservat && !seient.seleccionat_per_altre && toggleSeient(seient)"
             >
               {{ seient.fila }}{{ seient.numero }}
             </div>
@@ -95,6 +146,7 @@ watch(
           <div class="legend">
             <div class="legend-item"><span class="dot" style="background:#FFD700"></span> VIP (50€)</div>
             <div class="legend-item"><span class="dot" style="background:#4169E1"></span> Normal (20€)</div>
+            <div class="legend-item"><span class="dot other-selected-dot"></span> Seleccionat per un altre</div>
           </div>
 
           <div v-if="selectedSeients.length > 0" class="resum">
@@ -168,6 +220,17 @@ watch(
 
 .seient.selected {
   outline: 3px solid red;
+}
+
+.seient.other-selected {
+  background-color: #ffa500 !important; /* Taronja */
+  opacity: 0.8;
+  cursor: not-allowed;
+  border: 2px dashed #ff4500;
+}
+
+.other-selected-dot {
+  background-color: #ffa500;
 }
 
 .legend {

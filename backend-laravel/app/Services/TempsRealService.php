@@ -53,4 +53,19 @@ class TempsRealService
             'seient_id' => $seientId
         ]);
     }
+
+    public static function notificarAforoActualitzat(int $peliId, int $sessioId, int $aforoDisponible, bool $hiHaDisponibilitat): void
+    {
+        // Notificació per a la sessió (sala.vue)
+        self::publish(CHANNEL_SESSIO, EVENT_AFORO_ACTUALITZAT, [
+            'sessio_id' => $sessioId,
+            'aforo_disponible' => $aforoDisponible
+        ]);
+
+        // Notificació per a la pel·lícula (index.vue)
+        self::publish(CHANNEL_PELICULA, EVENT_AFORO_ACTUALITZAT, [
+            'pelicula_id' => $peliId,
+            'hi_ha_disponibilitat' => $hiHaDisponibilitat
+        ]);
+    }
 }

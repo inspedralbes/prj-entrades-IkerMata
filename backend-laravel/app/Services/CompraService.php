@@ -80,10 +80,23 @@ class CompraService
                 }
 
                 // Es comprova que no hi hagi ja una compra per aquest seient i sessió
-                $jaExisteix = CompraEntrada::where('sessio_id', $sessioId)->where('seient_id', $idNumeric)->exists();
-                if ($jaExisteix) {
+                $jaVenut = CompraEntrada::where('sessio_id', $sessioId)->where('seient_id', $idNumeric)->exists();
+                if ($jaVenut) {
                     DB::rollBack();
                     $resultat['missatge'] = 'Un o més seients ja estan venuts per aquesta sessió';
+
+                    return $resultat;
+                }
+
+                // Es comprova que no estigui reservat per algú altre en aquest moment
+                $reservatPerAltre = \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                    ->where('seient_id', $idNumeric)
+                    ->where('expires_at', '>', now())
+                    ->where('usuari_id', '!=', $usuariId)
+                    ->exists();
+                if ($reservatPerAltre) {
+                    DB::rollBack();
+                    $resultat['missatge'] = 'Un o més seients estan sent seleccionats per un altre usuari';
 
                     return $resultat;
                 }
@@ -107,11 +120,28 @@ class CompraService
                 $resultat['entrades'][] = $filaResposta;
             }
 
+            // Eliminem reserves temporals dels seients que acabem de comprar
+            \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                ->whereIn('seient_id', $seientIds)
+                ->delete();
+
             DB::commit();
             $resultat['ok'] = true;
             $resultat['missatge'] = 'Compra registrada';
 
             TempsRealService::notificarCompra($sessioId, $seientIds);
+
+            // Notificació de nou aforament
+            $peliId = $sessio->esdeveniment_id;
+            $ocupats = CompraEntrada::where('sessio_id', $sessioId)->count();
+            $aforoDisponible = $sessio->sala->capacitat - $ocupats;
+
+            $hiHaDisponibilitat = Sessio::where('esdeveniment_id', $peliId)->get()->contains(function ($s) {
+                $o = CompraEntrada::where('sessio_id', $s->id)->count();
+                return $o < $s->sala->capacitat;
+            });
+
+            TempsRealService::notificarAforoActualitzat($peliId, $sessioId, $aforoDisponible, $hiHaDisponibilitat);
         } catch (\Throwable $ex) {
             DB::rollBack();
             $resultat['missatge'] = 'Error en desar la compra: '.$ex->getMessage();

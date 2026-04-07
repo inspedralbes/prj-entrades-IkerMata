@@ -156,6 +156,9 @@ redisClient.subscribe(redisClient.CHANNELS.SESSIO, function (event, data) {
     } else if (event === redisClient.EVENTS.SEIENT_ALLIBERAT) {
         var sessioId = data.sessio_id;
         io.to('sessio:' + sessioId).emit('seient-alliberat', data);
+    } else if (event === redisClient.EVENTS.AFORO_ACTUALITZAT) {
+        var sessioId = data.sessio_id;
+        io.to('sessio:' + sessioId).emit('aforo-actualitzat', data);
     }
 });
 

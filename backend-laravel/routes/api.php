@@ -31,11 +31,17 @@ Route::get('/health/redis', function () {
 
 Route::get('/peliculas', function () {
     return Peli::all()->map(function ($p) {
+        // Mirem si hi ha alguna sessió amb seients lliures
+        $disponible = Sessio::where('esdeveniment_id', $p->id)->get()->contains(function ($s) {
+            $ocupats = \App\Models\CompraEntrada::where('sessio_id', $s->id)->count();
+            return $ocupats < $s->sala->capacitat;
+        });
+
         return [
             'id' => $p->id,
             'titol' => $p->titol,
             'imatge_url' => $p->imatge_url,
-            'seats_available' => 45
+            'hi_ha_disponibilitat' => $disponible
         ];
     });
 });
@@ -64,11 +70,15 @@ Route::get('/debug-sessions', function () {
 
 Route::get('/peliculas/{id}/sesiones', function ($id) {
     return Sessio::where('esdeveniment_id', $id)->with('sala')->get()->map(function ($s) {
+        $ocupats = \App\Models\CompraEntrada::where('sessio_id', $s->id)->count();
+        $disponible = $s->sala->capacitat - $ocupats;
+
         return [
             'id' => $s->id,
             'uuid' => $s->uuid,
             'sala_nom' => $s->sala->nom,
-            'data_hora' => $s->data_hora
+            'data_hora' => $s->data_hora,
+            'aforo_disponible' => $disponible
         ];
     });
 });
@@ -85,14 +95,27 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
         ->orderBy('numero')
         ->get();
 
-    return $seients->map(function ($s) {
+    // Obtenim seients ja venuts
+    $venuts = \App\Models\CompraEntrada::where('sessio_id', $id)->pluck('seient_id')->toArray();
+
+    // Obtenim reserves temporals actives
+    $reserves = \App\Models\ReservaTemporal::where('sessio_id', $id)
+        ->where('expires_at', '>', now())
+        ->get();
+
+    return $seients->map(function ($s) use ($venuts, $reserves) {
+        $isVenut = in_array($s->id, $venuts);
+        $reserva = $reserves->firstWhere('seient_id', $s->id);
+
         return [
             'id' => $s->id,
             'fila' => $s->fila,
             'numero' => $s->numero,
             'categoria' => $s->categoria->nom,
             'color' => $s->categoria->color_hex,
-            'reservat' => false
+            'reservat' => $isVenut,
+            'seleccionat_per_altre' => ! $isVenut && $reserva !== null,
+            'usuari_reserva' => $reserva ? $reserva->usuari_id : null
         ];
     });
 });
@@ -103,4 +126,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/entrades', [EntradaController::class, 'indexAutenticat']);
     Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
     Route::post('/comprar', [CompraController::class, 'desar']);
+    Route::post('/reservar', [CompraController::class, 'reservarTemporal']);
 });

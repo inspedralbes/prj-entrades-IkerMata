@@ -96,17 +96,23 @@ async function enviarCompra() {
     })
     navigateTo('/mis-entrades')
   } catch (e) {
-    var msg = 'Error en desar la compra'
-    if (e && e.data) {
-      if (e.data.missatge) {
-        msg = e.data.missatge
-      } else if (e.data.error) {
-        msg = e.data.error
+    if (e.response && e.response.status === 401) {
+      await auth.logout()
+      alert('La sessió ha caducat, cal tornar a entrar')
+      navigateTo('/login')
+    } else {
+      var msg = 'Error en desar la compra'
+      if (e && e.data) {
+        if (e.data.missatge) {
+          msg = e.data.missatge
+        } else if (e.data.error) {
+          msg = e.data.error
+        }
+      } else if (e && e.message) {
+        msg = e.message
       }
-    } else if (e && e.message) {
-      msg = e.message
+      alert(msg)
     }
-    alert(msg)
   } finally {
     enviant.value = false
   }

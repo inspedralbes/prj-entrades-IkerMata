@@ -5,6 +5,7 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
+const { joinPelicula, onAforoActualitzat } = useSocket()
 
 const peliId = route.query.peli
 
@@ -12,6 +13,21 @@ const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { 
 const { data: sessions } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
   baseURL,
   immediate: !!peliId
+})
+
+onMounted(() => {
+  if (peliId) {
+    joinPelicula(peliId)
+  }
+
+  onAforoActualitzat((data) => {
+    if (data.sessio_id && sessions.value) {
+      const sessio = sessions.value.find(s => s.id === data.sessio_id)
+      if (sessio) {
+        sessio.aforo_disponible = data.aforo_disponible
+      }
+    }
+  })
 })
 
 function anarAButaques(sessioId) {
@@ -41,9 +57,20 @@ function anarAButaques(sessioId) {
             v-for="sessio in sessions"
             :key="sessio.id"
             type="button"
+            :disabled="sessio.aforo_disponible <= 0"
+            :class="{ 'full-btn': sessio.aforo_disponible <= 0 }"
             @click="anarAButaques(sessio.id)"
           >
-            {{ sessio.sala_nom }} - {{ sessio.data_hora }}
+            <div class="sessio-info">
+              <span class="sala">{{ sessio.sala_nom }}</span>
+              <span class="hora">{{ sessio.data_hora }}</span>
+            </div>
+            <div class="aforo-info">
+              <span v-if="sessio.aforo_disponible > 0" class="lluny">
+                {{ sessio.aforo_disponible }} butaques lliures
+              </span>
+              <span v-else class="full-text">Sessió completa</span>
+            </div>
           </button>
         </div>
       </div>
@@ -83,15 +110,46 @@ function anarAButaques(sessioId) {
 }
 
 .sessions button {
-  padding: 10px 20px;
+  padding: 12px 24px;
   border: 1px solid #ccc;
-  background: #f5f5f5;
+  background: #f8f9fa;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 180px;
+  transition: all 0.2s;
 }
 
-.sessions button:hover {
-  background: #e8e8e8;
+.sessions button:hover:not(:disabled) {
+  background: #e9ecef;
   border-color: #007bff;
+  transform: translateY(-2px);
+}
+
+.sessions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.full-btn {
+  background: #fff5f5 !important;
+  border-color: #feb2b2 !important;
+}
+
+.sessio-info {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.aforo-info {
+  font-size: 0.85em;
+  color: #666;
+}
+
+.full-text {
+  color: #c53030;
+  font-weight: bold;
 }
 </style>
