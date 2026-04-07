@@ -8,6 +8,7 @@ use App\Models\CompraEntrada;
 use App\Models\PreuSessio;
 use App\Models\Seient;
 use App\Models\Sessio;
+use App\Services\TempsRealService;
 use Illuminate\Support\Facades\DB;
 
 //================================ PROPIETATS / ATRIBUTS ============
@@ -109,6 +110,8 @@ class CompraService
             DB::commit();
             $resultat['ok'] = true;
             $resultat['missatge'] = 'Compra registrada';
+
+            TempsRealService::notificarCompra($sessioId, $seientIds);
         } catch (\Throwable $ex) {
             DB::rollBack();
             $resultat['missatge'] = 'Error en desar la compra: '.$ex->getMessage();
