@@ -72,7 +72,10 @@ export const useAuthStore = defineStore('auth', () => {
         headers: capcalarsAutenticacio()
       })
     } catch (e) {
-      console.error('Error enviant petició de logout al servidor:', e)
+      var status = e.statusCode ?? e.response?.status
+      if (status !== 401) {
+        console.error('Error enviant petició de logout al servidor:', e)
+      }
     } finally {
       token.value = null
       user.value = null
@@ -82,7 +85,24 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const isAuthenticated = computed(() => !!token.value)
-  const currentUserId = computed(() => user.value ? user.value.id : null)
+  const currentUserId = computed(() => (user.value ? user.value.id : null))
+
+  /** Si hi ha token però falta l'usuari (cookie antiga), carrega GET /usuari. */
+  async function syncUsuariSiCal(apiBase) {
+    if (!token.value) return
+    if (user.value && user.value.id) return
+    try {
+      const u = await $fetch(apiBase + '/usuari', {
+        headers: capcalarsAutenticacio()
+      })
+      if (u && u.id) {
+        user.value = u
+        userCookie.value = u
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
 
   return {
     token,
@@ -91,6 +111,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     registrar,
     logout,
+    syncUsuariSiCal,
     isAuthenticated,
     currentUserId
   }

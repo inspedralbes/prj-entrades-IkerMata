@@ -4,8 +4,9 @@
 TRUNCATE compres_entrades, reserves_temporals, personal_access_tokens, preus_sessio, seients, sessions, pelis, sales, categories_seients, users CASCADE;
 
 -- Users de test (contrasenya: password)
+-- Hash bcrypt generat amb Hash::make('password') (PHP 8.4); l'antic hash de documentació Laravel no verifica bé.
 INSERT INTO users (id, nom, email, password, rol, email_verified_at) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$10$Mrku12cpjmtvie359qYkzu4s5.5wZ1PXVoaVbtlr2qRIhPFy/q6ci', 'client', NULL);
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$N2Auy7BkTuhUBuuljRsw1OG3YDibzVvt9ZJEPbJhksiK/n8QpsR/C', 'client', NULL);
 
 -- Categories de seients (només VIP i Normal)
 INSERT INTO categories_seients (id, nom, color_hex) VALUES
@@ -25,6 +26,14 @@ INSERT INTO seients (id, sala_id, fila, numero, categoria_id) VALUES
 (31, 1, 'D', 1, 1), (32, 1, 'D', 2, 1), (33, 1, 'D', 3, 1), (34, 1, 'D', 4, 1), (35, 1, 'D', 5, 1), (36, 1, 'D', 6, 1), (37, 1, 'D', 7, 1), (38, 1, 'D', 8, 1), (39, 1, 'D', 9, 1), (40, 1, 'D', 10, 1),
 (41, 1, 'E', 1, 2), (42, 1, 'E', 2, 2), (43, 1, 'E', 3, 2), (44, 1, 'E', 4, 2), (45, 1, 'E', 5, 2), (46, 1, 'E', 6, 2), (47, 1, 'E', 7, 2), (48, 1, 'E', 8, 2), (49, 1, 'E', 9, 2), (50, 1, 'E', 10, 2);
 
+-- Seients Sala Petita (mateixa distribució 5x10, fila D VIP)
+INSERT INTO seients (id, sala_id, fila, numero, categoria_id) VALUES
+(51, 2, 'A', 1, 2), (52, 2, 'A', 2, 2), (53, 2, 'A', 3, 2), (54, 2, 'A', 4, 2), (55, 2, 'A', 5, 2), (56, 2, 'A', 6, 2), (57, 2, 'A', 7, 2), (58, 2, 'A', 8, 2), (59, 2, 'A', 9, 2), (60, 2, 'A', 10, 2),
+(61, 2, 'B', 1, 2), (62, 2, 'B', 2, 2), (63, 2, 'B', 3, 2), (64, 2, 'B', 4, 2), (65, 2, 'B', 5, 2), (66, 2, 'B', 6, 2), (67, 2, 'B', 7, 2), (68, 2, 'B', 8, 2), (69, 2, 'B', 9, 2), (70, 2, 'B', 10, 2),
+(71, 2, 'C', 1, 2), (72, 2, 'C', 2, 2), (73, 2, 'C', 3, 2), (74, 2, 'C', 4, 2), (75, 2, 'C', 5, 2), (76, 2, 'C', 6, 2), (77, 2, 'C', 7, 2), (78, 2, 'C', 8, 2), (79, 2, 'C', 9, 2), (80, 2, 'C', 10, 2),
+(81, 2, 'D', 1, 1), (82, 2, 'D', 2, 1), (83, 2, 'D', 3, 1), (84, 2, 'D', 4, 1), (85, 2, 'D', 5, 1), (86, 2, 'D', 6, 1), (87, 2, 'D', 7, 1), (88, 2, 'D', 8, 1), (89, 2, 'D', 9, 1), (90, 2, 'D', 10, 1),
+(91, 2, 'E', 1, 2), (92, 2, 'E', 2, 2), (93, 2, 'E', 3, 2), (94, 2, 'E', 4, 2), (95, 2, 'E', 5, 2), (96, 2, 'E', 6, 2), (97, 2, 'E', 7, 2), (98, 2, 'E', 8, 2), (99, 2, 'E', 9, 2), (100, 2, 'E', 10, 2);
+
 -- Pelicules
 INSERT INTO pelis (id, uuid, titol, descripcio, imatge_url, durada_minuts, estat) VALUES
 (1, 'b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'El Padrino', 'Saga mafiosa de Francis Ford Coppola', 'https://picsum.photos/seed/padrino/400/600', 175, 'actiu'),
@@ -32,24 +41,35 @@ INSERT INTO pelis (id, uuid, titol, descripcio, imatge_url, durada_minuts, estat
 (3, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Inception', 'Somnis dins de somnis', 'https://picsum.photos/seed/inception/400/600', 148, 'actiu'),
 (4, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', 'Titanic', 'Una historia de amor a l''Atlantic', 'https://picsum.photos/seed/titanic/400/600', 194, 'actiu');
 
--- Sessions
+-- Sessions (3 passis per pel·lícula: horaris repartits entre les dues sales)
 INSERT INTO sessions (id, uuid, esdeveniment_id, sala_id, data_hora) VALUES
-(1, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a20', 1, 1, '2026-04-01 20:00:00'),
-(2, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 2, 1, '2026-04-02 22:00:00'),
-(3, 'f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 3, 2, '2026-04-03 19:00:00'),
-(4, 'a6eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 4, 2, '2026-04-04 18:00:00');
+(1, 'd3eebc99-9c0b-4ef8-bb6d-6bb9bd380a20', 1, 1, '2026-04-01 18:00:00'),
+(2, 'e4eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 1, 1, '2026-04-01 21:30:00'),
+(3, 'f5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 1, 2, '2026-04-02 16:45:00'),
+(4, 'a6eebc99-9c0b-4ef8-bb6d-6bb9bd380a24', 2, 1, '2026-04-02 17:30:00'),
+(5, 'b7eebc99-9c0b-4ef8-bb6d-6bb9bd380a25', 2, 2, '2026-04-02 20:15:00'),
+(6, 'c8eebc99-9c0b-4ef8-bb6d-6bb9bd380a26', 2, 1, '2026-04-03 22:00:00'),
+(7, 'd9eebc99-9c0b-4ef8-bb6d-6bb9bd380a27', 3, 2, '2026-04-03 19:00:00'),
+(8, 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a28', 3, 1, '2026-04-04 18:30:00'),
+(9, 'f1eebc99-9c0b-4ef8-bb6d-6bb9bd380a29', 3, 2, '2026-04-05 21:00:00'),
+(10, 'a2eebc99-9c0b-4ef8-bb6d-6bb9bd380a2a', 4, 1, '2026-04-04 17:00:00'),
+(11, 'b3eebc99-9c0b-4ef8-bb6d-6bb9bd380a2b', 4, 2, '2026-04-05 19:45:00'),
+(12, 'c4eebc99-9c0b-4ef8-bb6d-6bb9bd380a2c', 4, 1, '2026-04-06 20:30:00');
 
--- Preus per sessio (VIP i Normal)
+-- Preus per sessio (VIP i Normal): VIP 9,70 € / Normal 6,70 €
 INSERT INTO preus_sessio (sessio_id, categoria_id, preu) VALUES
-(1, 1, 50.00), (1, 2, 20.00),
-(2, 1, 50.00), (2, 2, 20.00),
-(3, 1, 40.00), (3, 2, 15.00),
-(4, 1, 45.00), (4, 2, 18.00);
-
--- Entrades comprades d'exemple (usuari de test)
-INSERT INTO compres_entrades (usuari_id, sessio_id, seient_id, preu_pagat) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1, 5, 20.00),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 1, 6, 20.00);
+(1, 1, 9.70), (1, 2, 6.70),
+(2, 1, 9.70), (2, 2, 6.70),
+(3, 1, 9.70), (3, 2, 6.70),
+(4, 1, 9.70), (4, 2, 6.70),
+(5, 1, 9.70), (5, 2, 6.70),
+(6, 1, 9.70), (6, 2, 6.70),
+(7, 1, 9.70), (7, 2, 6.70),
+(8, 1, 9.70), (8, 2, 6.70),
+(9, 1, 9.70), (9, 2, 6.70),
+(10, 1, 9.70), (10, 2, 6.70),
+(11, 1, 9.70), (11, 2, 6.70),
+(12, 1, 9.70), (12, 2, 6.70);
 
 -- Reset de les sequencies
 SELECT setval('pelis_id_seq', (SELECT max(id) FROM pelis));

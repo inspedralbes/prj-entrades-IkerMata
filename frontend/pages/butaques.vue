@@ -4,12 +4,26 @@ definePageMeta({
 })
 
 const route = useRoute()
+const config = useRuntimeConfig()
 const baseURL = useApiBase()
+const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
-const { joinSessio, joinPelicula, socket } = useSocket()
+const { ensureSocket, joinSessio } = useSocket()
 
 const peliId = route.query.peli
 const sessioId = route.query.sessio
+
+function mateixaSessio(id) {
+  return id != null && Number(id) === Number(sessioId)
+}
+
+function patchSeient(seientId, patch) {
+  const list = seients.value
+  if (!list) return
+  const i = list.findIndex((s) => s.id === seientId)
+  if (i === -1) return
+  list[i] = { ...list[i], ...patch }
+}
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
 const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
@@ -18,40 +32,111 @@ const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await us
 })
 
 const selectedSeients = ref([])
+const reservaEnCurs = ref(false)
 
-onMounted(() => {
+function onSeientSeleccionat(data) {
+  if (!mateixaSessio(data.sessio_id) || !seients.value) return
+  const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
+  const actor = data.usuari_id != null ? String(data.usuari_id) : ''
+  if (jo && actor === jo) {
+    return
+  }
+  if (!jo && selectedSeients.value.some((s) => s.id === data.seient_id)) {
+    return
+  }
+  patchSeient(data.seient_id, { seleccionat_per_altre: true })
+}
+
+function onSeientAlliberat(data) {
+  if (!mateixaSessio(data.sessio_id) || !seients.value) return
+  patchSeient(data.seient_id, { seleccionat_per_altre: false })
+}
+
+function onCompraCreada(data) {
+  if (!mateixaSessio(data.sessio_id) || !data.seient_ids || !seients.value) return
+  const ids = new Set(data.seient_ids.map((id) => Number(id)))
+  for (const id of ids) {
+    patchSeient(id, { reservat: true, seleccionat_per_altre: false })
+  }
+  selectedSeients.value = selectedSeients.value.filter((s) => !ids.has(s.id))
+}
+
+function rejoinSalaAlConnectar() {
+  if (sessioId) {
+    joinSessio(sessioId)
+  }
+}
+
+/** Allibera totes les reserves temporals de l'usuari en aquesta sessió (POST estat: false). */
+async function alliberarReservesSeleccionades() {
+  const seats = selectedSeients.value.slice()
+  if (!sessioId || seats.length === 0) {
+    return
+  }
+  await Promise.all(
+    seats.map((seient) =>
+      $fetch(`${gatewayURL}/api/reservar`, {
+        method: 'POST',
+        headers: authStore.capcalarsAutenticacio(),
+        body: {
+          sessioId,
+          seientId: seient.id,
+          estat: false
+        }
+      }).catch(() => {})
+    )
+  )
+  selectedSeients.value = []
+}
+
+function vaAPagament(to) {
+  const p = to.path || ''
+  return p === '/pago' || p.startsWith('/pago/')
+}
+
+onBeforeRouteLeave(async (to) => {
+  if (vaAPagament(to)) {
+    return true
+  }
+  await alliberarReservesSeleccionades()
+})
+
+onMounted(async () => {
+  await authStore.syncUsuariSiCal(baseURL)
+
   if (sessioId) {
     joinSessio(sessioId)
   }
 
-  socket.on('seient-seleccionat', (data) => {
-    if (data.sessio_id == sessioId && seients.value) {
-      const s = seients.value.find(s => s.id === data.seient_id)
-      if (s) {
-        const currentUserId = authStore.currentUserId
-        if (data.usuari_id !== currentUserId) {
-           s.seleccionat_per_altre = true
-        }
-      }
-    }
-  })
+  const socket = ensureSocket()
+  if (!socket) return
 
-  socket.on('seient-alliberat', (data) => {
-    if (data.sessio_id == sessioId && seients.value) {
-      const s = seients.value.find(s => s.id === data.seient_id)
-      if (s) {
-        s.seleccionat_per_altre = false
-      }
-    }
-  })
+  socket.on('connect', rejoinSalaAlConnectar)
+
+  socket.on('seient-seleccionat', onSeientSeleccionat)
+  socket.on('seient-alliberat', onSeientAlliberat)
+  socket.on('compra-creada', onCompraCreada)
+})
+
+onUnmounted(() => {
+  const socket = ensureSocket()
+  if (!socket) return
+  socket.off('connect', rejoinSalaAlConnectar)
+  socket.off('seient-seleccionat', onSeientSeleccionat)
+  socket.off('seient-alliberat', onSeientAlliberat)
+  socket.off('compra-creada', onCompraCreada)
 })
 
 async function toggleSeient(seient) {
+  if (reservaEnCurs.value) {
+    return
+  }
   const index = selectedSeients.value.findIndex(s => s.id === seient.id)
   const nouEstat = index === -1
 
+  reservaEnCurs.value = true
   try {
-    await $fetch(`${baseURL}/reservar`, {
+    await $fetch(`${gatewayURL}/api/reservar`, {
       method: 'POST',
       headers: authStore.capcalarsAutenticacio(),
       body: {
@@ -62,7 +147,9 @@ async function toggleSeient(seient) {
     })
 
     if (nouEstat) {
-      selectedSeients.value.push(seient)
+      if (!selectedSeients.value.some((s) => s.id === seient.id)) {
+        selectedSeients.value.push(seient)
+      }
     } else {
       selectedSeients.value.splice(index, 1)
     }
@@ -74,12 +161,14 @@ async function toggleSeient(seient) {
       alert(e.data?.error || 'No s\'ha pogut reservar el seient')
       refreshSeats()
     }
+  } finally {
+    reservaEnCurs.value = false
   }
 }
 
 function getPreu(categoria) {
-  if (categoria === 'VIP') return 50
-  return 20
+  if (categoria === 'VIP') return 9.7
+  return 6.7
 }
 
 const totalPreu = computed(() => {
@@ -145,8 +234,8 @@ watch(
           </div>
 
           <div class="legend">
-            <div class="legend-item"><span class="dot" style="background:#FFD700"></span> VIP (50€)</div>
-            <div class="legend-item"><span class="dot" style="background:#4169E1"></span> Normal (20€)</div>
+            <div class="legend-item"><span class="dot" style="background:#FFD700"></span> VIP (9,70€)</div>
+            <div class="legend-item"><span class="dot" style="background:#4169E1"></span> Normal (6,70€)</div>
             <div class="legend-item"><span class="dot other-selected-dot"></span> Seleccionat per un altre</div>
           </div>
 

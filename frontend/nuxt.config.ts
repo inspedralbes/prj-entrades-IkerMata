@@ -20,5 +20,10 @@ export default defineNuxtConfig({
     '/pago': { ssr: false },
     '/login': { ssr: false },
     '/registre': { ssr: false }
+  },
+  vite: {
+    optimizeDeps: {
+      include: ['socket.io-client']
+    }
   }
 })

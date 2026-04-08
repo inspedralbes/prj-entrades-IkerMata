@@ -5,7 +5,9 @@ definePageMeta({
 })
 
 const route = useRoute()
+const config = useRuntimeConfig()
 const baseURL = useApiBase()
+const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
 
 function primerQuery(val) {
@@ -35,8 +37,8 @@ const seleccionats = computed(() => {
 })
 
 function getPreu(categoria) {
-  if (categoria === 'VIP') return 50
-  return 20
+  if (categoria === 'VIP') return 9.7
+  return 6.7
 }
 
 const totalPreu = computed(() => {
@@ -88,7 +90,7 @@ async function enviarCompra() {
       sessioId: sessioNum,
       seientIds: seientIds.value
     }
-    var urlComprar = baseURL + '/comprar'
+    var urlComprar = gatewayURL + '/api/comprar'
     await $fetch(urlComprar, {
       method: 'POST',
       body: cos,

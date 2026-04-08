@@ -86,12 +86,12 @@ class DatabaseSeeder extends Seeder
             PreuSessio::create([
                 'sessio_id' => $sessio->id,
                 'categoria_id' => $catVip->id,
-                'preu' => 50.00,
+                'preu' => 9.70,
             ]);
             PreuSessio::create([
                 'sessio_id' => $sessio->id,
                 'categoria_id' => $catNormal->id,
-                'preu' => 20.00,
+                'preu' => 6.70,
             ]);
         }
     }

@@ -46,16 +46,34 @@ app.get('/health/redis', function (req, res) {
     });
 });
 
-// Proxy route example
+// Reserva temporal: reenvia Bearer i, si OK, emet Socket.io a la sala (no depèn només de Redis).
 app.post('/api/reservar', function (req, res) {
-    var headers = { 'Accept': 'application/json' };
+    var headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    };
     if (req.headers.authorization) {
         headers['Authorization'] = req.headers.authorization;
     }
     axios.post(LARAVEL_API_URL + '/reservar', req.body, { headers: headers })
         .then(function (response) {
-            if (response.status === 200 || response.status === 201) {
-                // io.emit('reserva-confirmada', response.data); // Not used yet
+            if ((response.status === 200 || response.status === 201) && response.data && response.data.ok) {
+                var d = response.data;
+                if (d.sessio_id != null && d.seient_id != null) {
+                    var room = 'sessio:' + String(d.sessio_id);
+                    if (d.reserva_activa) {
+                        io.to(room).emit('seient-seleccionat', {
+                            sessio_id: d.sessio_id,
+                            seient_id: d.seient_id,
+                            usuari_id: d.usuari_id
+                        });
+                    } else {
+                        io.to(room).emit('seient-alliberat', {
+                            sessio_id: d.sessio_id,
+                            seient_id: d.seient_id
+                        });
+                    }
+                }
             }
             res.status(response.status).json(response.data);
         })
@@ -124,8 +142,18 @@ app.post('/api/comprar', function (req, res) {
     }
     axios.post(LARAVEL_API_URL + '/comprar', req.body, { headers: headers })
         .then(function (response) {
-            if (response.status === 200 || response.status === 201) {
-                io.emit('compra-registrada', response.data);
+            if ((response.status === 200 || response.status === 201) && response.data && response.data.ok) {
+                var d = response.data;
+                var sid = d.sessio_id;
+                if (sid != null && d.entrades && d.entrades.length) {
+                    var seientIds = d.entrades.map(function (e) {
+                        return e.seient_id;
+                    });
+                    io.to('sessio:' + String(sid)).emit('compra-creada', {
+                        sessio_id: sid,
+                        seient_ids: seientIds
+                    });
+                }
             }
             res.status(response.status).json(response.data);
         })
@@ -144,29 +172,39 @@ app.post('/api/comprar', function (req, res) {
 //================================ SUBSCRIPCIONS REDIS ==========================
 //==============================================================================
 
-// Subscripció a canals Redis i reemissió per Socket.io
-redisClient.subscribe(redisClient.CHANNELS.SESSIO, function (event, data) {
+// Laravel aplica REDIS_PREFIX als canals de PUBLISH (p. ex. "laravel-database-sessio").
+// Escoltem el canal pla i el prefix per defecte d'APP_NAME=Laravel per cobrir tots dos casos.
+var LARAVEL_DEFAULT_PUBSUB_PREFIX = process.env.LARAVEL_DEFAULT_PUBSUB_PREFIX || 'laravel-database-';
+
+function emitToSessioRoom(sessioId, eventName, payload) {
+    var room = 'sessio:' + String(sessioId);
+    io.to(room).emit(eventName, payload);
+}
+
+function onRedisSessioChannel(event, data) {
     console.log('Redis event:', event, data);
     if (event === redisClient.EVENTS.COMPRA_CREADA) {
-        var sessioId = data.sessio_id;
-        io.to('sessio:' + sessioId).emit('compra-creada', data);
+        emitToSessioRoom(data.sessio_id, 'compra-creada', data);
     } else if (event === redisClient.EVENTS.SEIENT_SELECCIONAT) {
-        var sessioId = data.sessio_id;
-        io.to('sessio:' + sessioId).emit('seient-seleccionat', data);
+        emitToSessioRoom(data.sessio_id, 'seient-seleccionat', data);
     } else if (event === redisClient.EVENTS.SEIENT_ALLIBERAT) {
-        var sessioId = data.sessio_id;
-        io.to('sessio:' + sessioId).emit('seient-alliberat', data);
+        emitToSessioRoom(data.sessio_id, 'seient-alliberat', data);
     } else if (event === redisClient.EVENTS.AFORO_ACTUALITZAT) {
-        var sessioId = data.sessio_id;
-        io.to('sessio:' + sessioId).emit('aforo-actualitzat', data);
+        emitToSessioRoom(data.sessio_id, 'aforo-actualitzat', data);
     }
-});
+}
 
-redisClient.subscribe(redisClient.CHANNELS.PELICULA, function (event, data) {
+redisClient.subscribe(redisClient.CHANNELS.SESSIO, onRedisSessioChannel);
+redisClient.subscribe(LARAVEL_DEFAULT_PUBSUB_PREFIX + redisClient.CHANNELS.SESSIO, onRedisSessioChannel);
+
+function onRedisPeliculaChannel(event, data) {
     console.log('Redis pelicula event:', event, data);
     var peliculaId = data.pelicula_id;
-    io.to('pelicula:' + peliculaId).emit('aforo-actualitzat', data);
-});
+    io.to('pelicula:' + String(peliculaId)).emit('aforo-actualitzat', data);
+}
+
+redisClient.subscribe(redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
+redisClient.subscribe(LARAVEL_DEFAULT_PUBSUB_PREFIX + redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
 
 //==============================================================================
 //================================ SOCKET.IO ================================
@@ -176,13 +214,15 @@ io.on('connection', function (socket) {
     console.log('a user connected', socket.id);
 
     socket.on('unirse-sessio', function (sessioId) {
-        socket.join('sessio:' + sessioId);
-        console.log('socket', socket.id, 'joined sessio:', sessioId);
+        var room = 'sessio:' + String(sessioId);
+        socket.join(room);
+        console.log('socket', socket.id, 'joined', room);
     });
 
     socket.on('unirse-pelicula', function (peliculaId) {
-        socket.join('pelicula:' + peliculaId);
-        console.log('socket', socket.id, 'joined pelicula:', peliculaId);
+        var room = 'pelicula:' + String(peliculaId);
+        socket.join(room);
+        console.log('socket', socket.id, 'joined', room);
     });
 
     socket.on('disconnect', function () {

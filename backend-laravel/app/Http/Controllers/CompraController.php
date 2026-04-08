@@ -63,6 +63,8 @@ class CompraController extends Controller
 
         // C. Resposta segons el resultat
         if ($resultat['ok']) {
+            $resultat['sessio_id'] = $sessioId;
+
             return response()->json($resultat, 201);
         }
 
@@ -114,7 +116,15 @@ class CompraController extends Controller
             );
 
             \App\Services\TempsRealService::notificarSeleccionat($sessioId, $seientId, (string)$usuari->id);
-            return response()->json(['ok' => true, 'missatge' => 'Seient reservat temporalment']);
+
+            return response()->json([
+                'ok' => true,
+                'missatge' => 'Seient reservat temporalment',
+                'sessio_id' => (int) $sessioId,
+                'seient_id' => (int) $seientId,
+                'usuari_id' => (string) $usuari->id,
+                'reserva_activa' => true,
+            ]);
         } else {
             // Alliberar reserva
             \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
@@ -123,7 +133,15 @@ class CompraController extends Controller
                 ->delete();
 
             \App\Services\TempsRealService::notificarAlliberat($sessioId, $seientId);
-            return response()->json(['ok' => true, 'missatge' => 'Reserva temporal lliure']);
+
+            return response()->json([
+                'ok' => true,
+                'missatge' => 'Reserva temporal lliure',
+                'sessio_id' => (int) $sessioId,
+                'seient_id' => (int) $seientId,
+                'usuari_id' => (string) $usuari->id,
+                'reserva_activa' => false,
+            ]);
         }
     }
 }

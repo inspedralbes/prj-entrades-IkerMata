@@ -173,9 +173,9 @@ class CompraService
         }
 
         if ($nomCategoria === 'VIP') {
-            return '50.00';
+            return '9.70';
         }
 
-        return '20.00';
+        return '6.70';
     }
 }

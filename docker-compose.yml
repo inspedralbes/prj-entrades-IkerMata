@@ -28,7 +28,9 @@ services:
       - "3003:3001"
     volumes:
       - ./backend-node:/usr/src/app
-      - /usr/src/app/node_modules
+      # Volum anomenat: si falten dependències (p. ex. ioredis), eliminar amb:
+      # docker compose down && docker volume rm prj-entrades-ikermata_gateway_node_modules
+      - gateway_node_modules:/usr/src/app/node_modules
     environment:
       - NODE_ENV=development
       - LARAVEL_API_URL=http://web/api
@@ -52,6 +54,14 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_CLIENT=predis
+      # Mateix canal Redis pub/sub que el gateway (sense prefix per defecte de Laravel)
+      - REDIS_PREFIX=
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 90s
     networks:
       - ticket-net
     depends_on:
@@ -71,7 +81,8 @@ services:
     networks:
       - ticket-net
     depends_on:
-      - app
+      app:
+        condition: service_healthy
 
   # Redis (temps real / cues; Laravel + Node)
   redis:
@@ -118,3 +129,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  gateway_node_modules:

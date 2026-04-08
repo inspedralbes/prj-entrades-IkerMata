@@ -1,0 +1,2 @@
+# Scripts shell: LF obligatori (CRLF trenca exec al contenidor Linux)
+docker/php/*.sh text eol=lf

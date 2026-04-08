@@ -10,7 +10,8 @@ RUN apk add --no-cache \
     zip \
     unzip \
     postgresql-dev \
-    postgresql-client
+    postgresql-client \
+    netcat-openbsd
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd
@@ -21,12 +22,11 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Set working directory
 WORKDIR /var/www
 
-# Copy entrypoint script
+# Script d'arrencada (CRLF de Windows trenca exec: normalitzar i invocar amb sh)
 COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
-# Set entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/entrypoint.sh"]
 
 # Expose port 9000
 EXPOSE 9000

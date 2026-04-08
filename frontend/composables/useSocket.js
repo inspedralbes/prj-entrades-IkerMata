@@ -1,30 +1,58 @@
 import { io } from 'socket.io-client'
 
+/**
+ * Una sola connexió Socket.io compartida (evita múltiples websockets per pàgina).
+ */
 export function useSocket() {
-    const config = useRuntimeConfig()
-    const socket = io(config.public.gatewayUrl)
+  const config = useRuntimeConfig()
+  const socketRef = useState('socket-io-singleton', () => null)
 
-    function joinSessio(sessioId) {
-        socket.emit('unirse-sessio', sessioId)
+  function ensureSocket() {
+    if (import.meta.server) {
+      return null
     }
+    if (!socketRef.value) {
+      socketRef.value = io(config.public.gatewayUrl)
+    }
+    return socketRef.value
+  }
 
-    function joinPelicula(peliculaId) {
-        socket.emit('unirse-pelicula', peliculaId)
-    }
+  const socket = computed(() => ensureSocket())
 
-    function onAforoActualitzat(callback) {
-        socket.on('aforo-actualitzat', callback)
+  function joinSessio(sessioId) {
+    const s = ensureSocket()
+    if (s) {
+      s.emit('unirse-sessio', String(sessioId))
     }
+  }
 
-    function onCompraCreada(callback) {
-        socket.on('compra-creada', callback)
+  function joinPelicula(peliculaId) {
+    const s = ensureSocket()
+    if (s) {
+      s.emit('unirse-pelicula', String(peliculaId))
     }
+  }
 
-    return {
-        socket,
-        joinSessio,
-        joinPelicula,
-        onAforoActualitzat,
-        onCompraCreada
+  function onAforoActualitzat(callback) {
+    const s = ensureSocket()
+    if (s) {
+      s.on('aforo-actualitzat', callback)
     }
+  }
+
+  function onCompraCreada(callback) {
+    const s = ensureSocket()
+    if (s) {
+      s.on('compra-creada', callback)
+    }
+  }
+
+  return {
+    socket,
+    ensureSocket,
+    joinSessio,
+    joinPelicula,
+    onAforoActualitzat,
+    onCompraCreada
+  }
 }
