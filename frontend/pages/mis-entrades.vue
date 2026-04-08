@@ -5,11 +5,11 @@ definePageMeta({
 })
 
 const baseURL = useApiBase()
-const auth = useAuth()
+const authStore = useAuthStore()
 
 const { data: entrades, pending, error } = await useFetch('/entrades', {
   baseURL,
-  headers: auth.capcalarsAutenticacio()
+  headers: authStore.capcalarsAutenticacio()
 })
 </script>
 

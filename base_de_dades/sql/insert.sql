@@ -5,7 +5,7 @@ TRUNCATE compres_entrades, reserves_temporals, personal_access_tokens, preus_ses
 
 -- Users de test (contrasenya: password)
 INSERT INTO users (id, nom, email, password, rol, email_verified_at) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'client', NULL);
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$10$Mrku12cpjmtvie359qYkzu4s5.5wZ1PXVoaVbtlr2qRIhPFy/q6ci', 'client', NULL);
 
 -- Categories de seients (només VIP i Normal)
 INSERT INTO categories_seients (id, nom, color_hex) VALUES

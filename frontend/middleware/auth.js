@@ -1,6 +1,6 @@
 export default defineNuxtRouteMiddleware(function () {
-  var auth = useAuth()
-  if (!auth.token.value) {
+  var authStore = useAuthStore()
+  if (!authStore.token) {
     return navigateTo('/login')
   }
 })

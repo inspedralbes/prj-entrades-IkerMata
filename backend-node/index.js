@@ -48,71 +48,71 @@ app.get('/health/redis', function (req, res) {
 
 // Proxy route example
 app.post('/api/reservar', function (req, res) {
-    axios.post(LARAVEL_API_URL + '/reservar', req.body)
+    var headers = { 'Accept': 'application/json' };
+    if (req.headers.authorization) {
+        headers['Authorization'] = req.headers.authorization;
+    }
+    axios.post(LARAVEL_API_URL + '/reservar', req.body, { headers: headers })
         .then(function (response) {
-            if (response.status === 200) {
-                io.emit('reserva-confirmada', response.data);
+            if (response.status === 200 || response.status === 201) {
+                // io.emit('reserva-confirmada', response.data); // Not used yet
             }
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
-            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+            console.error('Gateway: Error en reservar:', error.response ? error.response.status : error.message);
+            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
         });
 });
 
 app.get('/api/peliculas', function (req, res) {
-    axios.get(LARAVEL_API_URL + '/pelis')
+    axios.get(LARAVEL_API_URL + '/peliculas', { headers: { 'Accept': 'application/json' } })
         .then(function (response) {
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
-            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+            console.error('Gateway: Error en peliculas:', error.response ? error.response.status : error.message);
+            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
         });
 });
 
 // Login: reenvia credencials a Laravel
 app.post('/api/login', function (req, res) {
-    axios.post(LARAVEL_API_URL + '/login', req.body)
+    axios.post(LARAVEL_API_URL + '/login', req.body, { headers: { 'Accept': 'application/json' } })
         .then(function (response) {
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
-            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+            console.error('Gateway: Error en login:', error.response ? error.response.status : error.message);
+            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
         });
 });
 
 // Register: reenvia dades a Laravel
 app.post('/api/register', function (req, res) {
-    axios.post(LARAVEL_API_URL + '/register', req.body)
+    axios.post(LARAVEL_API_URL + '/register', req.body, { headers: { 'Accept': 'application/json' } })
         .then(function (response) {
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
-            res.status(error.response.status || 500).json(error.response.data || { error: 'Internal Server Error' });
+            console.error('Gateway: Error en register:', error.response ? error.response.status : error.message);
+            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
         });
 });
 
 // Logout: reenvia el token a Laravel per tancar sessió
 app.post('/api/logout', function (req, res) {
-    console.log('Gateway: Peticio de logout rebuda. Headers auth:', req.headers.authorization);
-    var headers = {};
+    var headers = { 'Accept': 'application/json' };
     if (req.headers.authorization) {
         headers['Authorization'] = req.headers.authorization;
     }
     axios.post(LARAVEL_API_URL + '/logout', {}, { headers: headers })
         .then(function (response) {
-            console.log('Gateway: Logout satisfactori en Laravel');
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
-            console.error('Gateway: Error en logout de Laravel:', error.response ? error.response.status : error.message);
-            var status = 500;
-            var payload = { error: 'Internal Server Error' };
-            if (error.response) {
-                status = error.response.status;
-                payload = error.response.data;
-            }
-            res.status(status).json(payload);
+            console.error('Gateway: Error en logout:', error.response ? error.response.status : error.message);
+            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
         });
 });
 

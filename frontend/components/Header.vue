@@ -1,8 +1,9 @@
 <script setup>
-const auth = useAuth()
+const authStore = useAuthStore()
+const { token, user } = storeToRefs(authStore)
 
 async function tancarSessio() {
-  await auth.logout()
+  await authStore.logout()
   navigateTo('/')
 }
 </script>
@@ -12,7 +13,8 @@ async function tancarSessio() {
     <nav>
       <NuxtLink to="/">Cartelera</NuxtLink>
       <NuxtLink to="/mis-entrades">Mis entrades</NuxtLink>
-      <span v-if="auth.token.value" class="user">
+      <span v-if="token" class="user">
+        <span v-if="user">{{ user.nom }}</span>
         <button type="button" class="link-btn" @click="tancarSessio">Tancar sessió</button>
       </span>
       <NuxtLink v-else to="/login" class="login-link">Iniciar sessió</NuxtLink>

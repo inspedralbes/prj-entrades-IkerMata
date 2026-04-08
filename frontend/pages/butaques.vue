@@ -5,7 +5,7 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
-const auth = useAuth()
+const authStore = useAuthStore()
 const { joinSessio, joinPelicula, socket } = useSocket()
 
 const peliId = route.query.peli
@@ -28,7 +28,8 @@ onMounted(() => {
     if (data.sessio_id == sessioId && seients.value) {
       const s = seients.value.find(s => s.id === data.seient_id)
       if (s) {
-        if (data.usuari_id !== (auth.token.value ? '' : null)) { // Simplificació per demo
+        const currentUserId = authStore.currentUserId
+        if (data.usuari_id !== currentUserId) {
            s.seleccionat_per_altre = true
         }
       }
@@ -52,7 +53,7 @@ async function toggleSeient(seient) {
   try {
     await $fetch(`${baseURL}/reservar`, {
       method: 'POST',
-      headers: auth.capcalarsAutenticacio(),
+      headers: authStore.capcalarsAutenticacio(),
       body: {
         sessioId: sessioId,
         seientId: seient.id,
@@ -67,7 +68,7 @@ async function toggleSeient(seient) {
     }
   } catch (e) {
     if (e.response && e.response.status === 401) {
-      await auth.logout()
+      await authStore.logout()
       navigateTo('/login')
     } else {
       alert(e.data?.error || 'No s\'ha pogut reservar el seient')

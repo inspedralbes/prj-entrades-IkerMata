@@ -4,7 +4,7 @@ definePageMeta({
   layout: 'default'
 })
 
-const auth = useAuth()
+const authStore = useAuthStore()
 const nom = ref('')
 const email = ref('')
 const password = ref('')
@@ -15,7 +15,7 @@ async function enviar() {
   errorMsg.value = ''
   pending.value = true
   try {
-    await auth.registrar(nom.value, email.value, password.value)
+    await authStore.registrar(nom.value, email.value, password.value)
     navigateTo('/')
   } catch (e) {
     if (e.data && e.data.errors) {

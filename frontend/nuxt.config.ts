@@ -2,6 +2,10 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: false },
+  modules: ['@pinia/nuxt'],
+  pinia: {
+    autoImports: ['defineStore', 'storeToRefs'],
+  },
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:8001/api',

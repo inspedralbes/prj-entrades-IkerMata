@@ -5,7 +5,7 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
-const { joinPelicula, onAforoActualitzat } = useSocket()
+const { joinPelicula, joinSessio, onAforoActualitzat, socket } = useSocket()
 
 const peliId = route.query.peli
 
@@ -20,11 +20,30 @@ onMounted(() => {
     joinPelicula(peliId)
   }
 
+  // Join all session rooms to receive per-session aforo updates
+  if (sessions.value) {
+    sessions.value.forEach(s => joinSessio(s.id))
+  }
+
+  // Handle aforo update from sessio channel (has sessio_id + aforo_disponible)
   onAforoActualitzat((data) => {
+    if (sessions.value) {
+      if (data.sessio_id !== undefined) {
+        // Event from sessio channel: update the specific session
+        const sessio = sessions.value.find(s => s.id === data.sessio_id)
+        if (sessio) {
+          sessio.aforo_disponible = data.aforo_disponible
+        }
+      }
+    }
+  })
+
+  // Also listen for seient sold (compra-creada) to react to bulk purchases
+  socket.on('compra-creada', (data) => {
     if (data.sessio_id && sessions.value) {
       const sessio = sessions.value.find(s => s.id === data.sessio_id)
-      if (sessio) {
-        sessio.aforo_disponible = data.aforo_disponible
+      if (sessio && data.seient_ids) {
+        sessio.aforo_disponible = Math.max(0, (sessio.aforo_disponible ?? 0) - data.seient_ids.length)
       }
     }
   })

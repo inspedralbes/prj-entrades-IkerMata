@@ -6,7 +6,7 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
-const auth = useAuth()
+const authStore = useAuthStore()
 
 function primerQuery(val) {
   if (val == null) return undefined
@@ -92,12 +92,12 @@ async function enviarCompra() {
     await $fetch(urlComprar, {
       method: 'POST',
       body: cos,
-      headers: auth.capcalarsAutenticacio()
+      headers: authStore.capcalarsAutenticacio()
     })
     navigateTo('/mis-entrades')
   } catch (e) {
     if (e.response && e.response.status === 401) {
-      await auth.logout()
+      await authStore.logout()
       alert('La sessió ha caducat, cal tornar a entrar')
       navigateTo('/login')
     } else {
