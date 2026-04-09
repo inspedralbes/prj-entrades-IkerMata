@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Sessio;
 use Illuminate\Support\Facades\Redis;
 
 //================================ CONSTANTS ================================
@@ -67,5 +68,20 @@ class TempsRealService
             'pelicula_id' => $peliId,
             'hi_ha_disponibilitat' => $hiHaDisponibilitat
         ]);
+    }
+
+    /** Recalcula i publica l’aforament després de reserva / alliberament / caducitat. */
+    public static function pushAforoActualitzatPerSessio(int $sessioId): void
+    {
+        $sessio = Sessio::find($sessioId);
+        if ($sessio === null) {
+            return;
+        }
+
+        $peliId = (int) $sessio->esdeveniment_id;
+        $aforo = AforoService::placesDisponiblesSessio($sessioId);
+        $hiHa = AforoService::peliculaTeDisponibilitat($peliId);
+
+        self::notificarAforoActualitzat($peliId, $sessioId, $aforo, $hiHa);
     }
 }

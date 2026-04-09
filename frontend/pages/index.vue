@@ -1,28 +1,62 @@
 <script setup>
 const baseURL = useApiBase()
-const { joinPelicula, onAforoActualitzat } = useSocket()
+const { joinPelicula, onAforoActualitzat, ensureSocket } = useSocket()
 
-const { data: movies, pending, error } = await useFetch('/peliculas', {
+const { data: moviesData, pending, error } = await useFetch('/peliculas', {
   baseURL,
   timeout: 5000,
   key: 'cartellera-peliculas'
 })
 
-onMounted(() => {
-  if (movies.value) {
-    movies.value.forEach(movie => {
-      joinPelicula(movie.id)
-    })
-  }
+const movies = shallowRef([])
 
-  onAforoActualitzat((data) => {
-    if (data.pelicula_id && movies.value) {
-      const movie = movies.value.find(m => m.id === data.pelicula_id)
-      if (movie) {
-        movie.hi_ha_disponibilitat = data.hi_ha_disponibilitat
-      }
+watch(
+  moviesData,
+  (v) => {
+    if (v && Array.isArray(v)) {
+      movies.value = v.map((m) => ({ ...m }))
+    } else {
+      movies.value = []
     }
+  },
+  { immediate: true }
+)
+
+let offAforoActualitzat = () => {}
+let offSocketConnect = () => {}
+
+function joinAllPelicules() {
+  for (const m of movies.value) {
+    joinPelicula(m.id)
+  }
+}
+
+onMounted(() => {
+  offAforoActualitzat = onAforoActualitzat((data) => {
+    if (data.pelicula_id === undefined || data.hi_ha_disponibilitat === undefined) {
+      return
+    }
+    const pid = Number(data.pelicula_id)
+    const idx = movies.value.findIndex((m) => Number(m.id) === pid)
+    if (idx === -1) {
+      return
+    }
+    movies.value = movies.value.map((m, i) =>
+      i === idx ? { ...m, hi_ha_disponibilitat: data.hi_ha_disponibilitat } : m
+    )
   })
+
+  const socket = ensureSocket()
+  if (socket) {
+    socket.on('connect', joinAllPelicules)
+    offSocketConnect = () => socket.off('connect', joinAllPelicules)
+    joinAllPelicules()
+  }
+})
+
+onUnmounted(() => {
+  offAforoActualitzat()
+  offSocketConnect()
 })
 </script>
 

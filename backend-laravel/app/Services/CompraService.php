@@ -8,6 +8,7 @@ use App\Models\CompraEntrada;
 use App\Models\PreuSessio;
 use App\Models\Seient;
 use App\Models\Sessio;
+use App\Services\AforoService;
 use App\Services\TempsRealService;
 use Illuminate\Support\Facades\DB;
 
@@ -131,15 +132,9 @@ class CompraService
 
             TempsRealService::notificarCompra($sessioId, $seientIds);
 
-            // Notificació de nou aforament
-            $peliId = $sessio->esdeveniment_id;
-            $ocupats = CompraEntrada::where('sessio_id', $sessioId)->count();
-            $aforoDisponible = $sessio->sala->capacitat - $ocupats;
-
-            $hiHaDisponibilitat = Sessio::where('esdeveniment_id', $peliId)->get()->contains(function ($s) {
-                $o = CompraEntrada::where('sessio_id', $s->id)->count();
-                return $o < $s->sala->capacitat;
-            });
+            $peliId = (int) $sessio->esdeveniment_id;
+            $aforoDisponible = AforoService::placesDisponiblesSessio($sessioId);
+            $hiHaDisponibilitat = AforoService::peliculaTeDisponibilitat($peliId);
 
             TempsRealService::notificarAforoActualitzat($peliId, $sessioId, $aforoDisponible, $hiHaDisponibilitat);
         } catch (\Throwable $ex) {

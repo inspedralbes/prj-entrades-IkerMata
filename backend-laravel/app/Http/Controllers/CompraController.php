@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 //================================ NAMESPACES / IMPORTS ============
 
 use App\Services\CompraService;
+use App\Services\TempsRealService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -115,7 +116,7 @@ class CompraController extends Controller
                 ['expires_at' => now()->addMinutes(10)]
             );
 
-            \App\Services\TempsRealService::notificarSeleccionat($sessioId, $seientId, (string)$usuari->id);
+            TempsRealService::notificarSeleccionat($sessioId, $seientId, (string) $usuari->id);
 
             return response()->json([
                 'ok' => true,
@@ -132,7 +133,7 @@ class CompraController extends Controller
                 ->where('usuari_id', $usuari->id)
                 ->delete();
 
-            \App\Services\TempsRealService::notificarAlliberat($sessioId, $seientId);
+            TempsRealService::notificarAlliberat($sessioId, $seientId);
 
             return response()->json([
                 'ok' => true,

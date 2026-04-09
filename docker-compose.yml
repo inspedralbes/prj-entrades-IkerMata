@@ -68,6 +68,31 @@ services:
       - db
       - redis
 
+  # Planificador Laravel (caducitat reserves temporals → Redis / Socket.io)
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ticket-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend-laravel:/var/www
+    entrypoint: ['php', 'artisan', 'schedule:work']
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_CLIENT=predis
+      - REDIS_PREFIX=
+    networks:
+      - ticket-net
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+
   # Nginx Web Server for Laravel
   web:
     build:

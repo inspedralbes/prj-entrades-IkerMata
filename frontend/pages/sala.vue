@@ -5,48 +5,70 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
-const { joinPelicula, joinSessio, onAforoActualitzat, socket } = useSocket()
+const { joinPelicula, joinSessio, onAforoActualitzat, ensureSocket } = useSocket()
 
 const peliId = route.query.peli
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
-const { data: sessions } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
+const { data: sessionsData } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
   baseURL,
   immediate: !!peliId
 })
 
+/** Còpia reactiva (shallowRef): mutar objectes dins useFetch sovint no redibuixa la vista. */
+const sessions = shallowRef([])
+
+watch(
+  sessionsData,
+  (v) => {
+    if (v && Array.isArray(v)) {
+      sessions.value = v.map((s) => ({ ...s }))
+    } else {
+      sessions.value = []
+    }
+  },
+  { immediate: true }
+)
+
+let offAforoActualitzat = () => {}
+let offSocketConnect = () => {}
+
+function joinAllSocketRooms() {
+  if (!peliId) {
+    return
+  }
+  joinPelicula(peliId)
+  for (const s of sessions.value) {
+    joinSessio(s.id)
+  }
+}
+
 onMounted(() => {
-  if (peliId) {
-    joinPelicula(peliId)
-  }
-
-  // Join all session rooms to receive per-session aforo updates
-  if (sessions.value) {
-    sessions.value.forEach(s => joinSessio(s.id))
-  }
-
-  // Handle aforo update from sessio channel (has sessio_id + aforo_disponible)
-  onAforoActualitzat((data) => {
-    if (sessions.value) {
-      if (data.sessio_id !== undefined) {
-        // Event from sessio channel: update the specific session
-        const sessio = sessions.value.find(s => s.id === data.sessio_id)
-        if (sessio) {
-          sessio.aforo_disponible = data.aforo_disponible
-        }
-      }
+  offAforoActualitzat = onAforoActualitzat((data) => {
+    if (data.sessio_id === undefined || data.aforo_disponible === undefined) {
+      return
     }
+    const sid = Number(data.sessio_id)
+    const idx = sessions.value.findIndex((s) => Number(s.id) === sid)
+    if (idx === -1) {
+      return
+    }
+    sessions.value = sessions.value.map((s, i) =>
+      i === idx ? { ...s, aforo_disponible: data.aforo_disponible } : s
+    )
   })
 
-  // Also listen for seient sold (compra-creada) to react to bulk purchases
-  socket.on('compra-creada', (data) => {
-    if (data.sessio_id && sessions.value) {
-      const sessio = sessions.value.find(s => s.id === data.sessio_id)
-      if (sessio && data.seient_ids) {
-        sessio.aforo_disponible = Math.max(0, (sessio.aforo_disponible ?? 0) - data.seient_ids.length)
-      }
-    }
-  })
+  const socket = ensureSocket()
+  if (socket) {
+    socket.on('connect', joinAllSocketRooms)
+    offSocketConnect = () => socket.off('connect', joinAllSocketRooms)
+    joinAllSocketRooms()
+  }
+})
+
+onUnmounted(() => {
+  offAforoActualitzat()
+  offSocketConnect()
 })
 
 function anarAButaques(sessioId) {

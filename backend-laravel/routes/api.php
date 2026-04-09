@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\AforoService;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -31,17 +32,11 @@ Route::get('/health/redis', function () {
 
 Route::get('/peliculas', function () {
     return Peli::all()->map(function ($p) {
-        // Mirem si hi ha alguna sessió amb seients lliures
-        $disponible = Sessio::where('esdeveniment_id', $p->id)->get()->contains(function ($s) {
-            $ocupats = \App\Models\CompraEntrada::where('sessio_id', $s->id)->count();
-            return $ocupats < $s->sala->capacitat;
-        });
-
         return [
             'id' => $p->id,
             'titol' => $p->titol,
             'imatge_url' => $p->imatge_url,
-            'hi_ha_disponibilitat' => $disponible
+            'hi_ha_disponibilitat' => AforoService::peliculaTeDisponibilitat((int) $p->id),
         ];
     });
 });
@@ -70,15 +65,12 @@ Route::get('/debug-sessions', function () {
 
 Route::get('/peliculas/{id}/sesiones', function ($id) {
     return Sessio::where('esdeveniment_id', $id)->with('sala')->get()->map(function ($s) {
-        $ocupats = \App\Models\CompraEntrada::where('sessio_id', $s->id)->count();
-        $disponible = $s->sala->capacitat - $ocupats;
-
         return [
             'id' => $s->id,
             'uuid' => $s->uuid,
             'sala_nom' => $s->sala->nom,
             'data_hora' => $s->data_hora,
-            'aforo_disponible' => $disponible
+            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $s->id),
         ];
     });
 });

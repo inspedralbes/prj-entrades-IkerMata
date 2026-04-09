@@ -33,18 +33,23 @@ export function useSocket() {
     }
   }
 
+  /** Retorna una funció per fer `off` del mateix callback (evita fugues en canviar de pàgina). */
   function onAforoActualitzat(callback) {
     const s = ensureSocket()
     if (s) {
       s.on('aforo-actualitzat', callback)
+      return () => s.off('aforo-actualitzat', callback)
     }
+    return () => {}
   }
 
   function onCompraCreada(callback) {
     const s = ensureSocket()
     if (s) {
       s.on('compra-creada', callback)
+      return () => s.off('compra-creada', callback)
     }
+    return () => {}
   }
 
   return {
