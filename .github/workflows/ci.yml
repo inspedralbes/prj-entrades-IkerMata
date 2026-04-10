@@ -35,6 +35,8 @@ jobs:
         env:
           NUXT_PUBLIC_API_BASE: http://localhost:8001/api
           NUXT_PUBLIC_GATEWAY_URL: http://localhost:3003
+          NUXT_TELEMETRY_DISABLED: "1"
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm ci && npm run build
 
   backend:
@@ -49,7 +51,8 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_sqlite, mbstring, intl, bcmath, ctype, xml, dom, redis
+          # Sin extensión phpredis: en CI usas Predis + SQLite en memoria (phpunit.xml).
+          extensions: mbstring, intl, bcmath, ctype, xml, dom, fileinfo, pdo_sqlite, zip, openssl, curl
           coverage: none
 
       - name: Copy env for CI (antes de composer: post-install ejecuta artisan)
