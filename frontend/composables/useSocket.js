@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client'
+import { normalizePublicHttpUrl } from '~/composables/useApiBase'
 
 /**
  * Una sola connexió Socket.io compartida (evita múltiples websockets per pàgina).
@@ -12,7 +13,7 @@ export function useSocket() {
       return null
     }
     if (!socketRef.value) {
-      socketRef.value = io(config.public.gatewayUrl)
+      socketRef.value = io(normalizePublicHttpUrl(config.public.gatewayUrl))
     }
     return socketRef.value
   }
