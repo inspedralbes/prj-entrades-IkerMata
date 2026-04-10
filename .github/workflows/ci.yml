@@ -49,8 +49,11 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          extensions: pdo_sqlite, mbstring, intl, bcmath, redis
+          extensions: pdo_sqlite, mbstring, intl, bcmath, ctype, xml, dom, redis
           coverage: none
+
+      - name: Copy env for CI (antes de composer: post-install ejecuta artisan)
+        run: cp .env.example .env
 
       - name: Get Composer cache dir
         id: composer-cache
@@ -65,9 +68,6 @@ jobs:
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Copy env for CI
-        run: cp .env.example .env
 
       - name: Generate app key
         run: php artisan key:generate --force
