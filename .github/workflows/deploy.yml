@@ -13,8 +13,9 @@ jobs:
   deploy:
     name: Deploy to server
     runs-on: ubuntu-latest
-    # Sin estos secretos el SSH falla y todo el push marca error. Configúralos en Settings → Secrets → Actions.
-    if: ${{ secrets.SERVER_HOST != '' && secrets.SERVER_USER != '' && secrets.SERVER_SSH_KEY != '' }}
+    # No uses `secrets` en `if` del job: GitHub lo rechaza. Activa el deploy con variable del repo:
+    # Settings → Secrets and variables → Actions → Variables → DEPLOY_ENABLED = true
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
 
     steps:
       - name: Deploy via SSH
