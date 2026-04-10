@@ -35,7 +35,10 @@ Route::get('/peliculas', function () {
         return [
             'id' => $p->id,
             'titol' => $p->titol,
+            'descripcio' => $p->descripcio,
             'imatge_url' => $p->imatge_url,
+            'durada_minuts' => $p->durada_minuts,
+            'estat' => $p->estat,
             'hi_ha_disponibilitat' => AforoService::peliculaTeDisponibilitat((int) $p->id),
         ];
     });
@@ -119,4 +122,46 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
     Route::post('/comprar', [CompraController::class, 'desar']);
     Route::post('/reservar', [CompraController::class, 'reservarTemporal']);
+
+    // Rutes Admin - CRUD Pel·lícules
+    Route::post('/peliculas', function (Illuminate\Http\Request $request) {
+        $user = $request->user();
+        if ($user->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+        $peli = Peli::create($request->validate([
+            'titol' => 'required|string|max:255',
+            'descripcio' => 'required|string',
+            'imatge_url' => 'nullable|string',
+            'durada_minuts' => 'required|integer|min:1',
+            'estat' => 'nullable|in:actiu,inactiu'
+        ]));
+        return response()->json($peli, 201);
+    });
+
+    Route::put('/peliculas/{id}', function (Illuminate\Http\Request $request, $id) {
+        $user = $request->user();
+        if ($user->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+        $peli = Peli::findOrFail($id);
+        $peli->update($request->validate([
+            'titol' => 'sometimes|string|max:255',
+            'descripcio' => 'sometimes|string',
+            'imatge_url' => 'nullable|string',
+            'durada_minuts' => 'sometimes|integer|min:1',
+            'estat' => 'nullable|in:actiu,inactiu'
+        ]));
+        return response()->json($peli);
+    });
+
+    Route::delete('/peliculas/{id}', function (Illuminate\Http\Request $request, $id) {
+        $user = $request->user();
+        if ($user->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+        $peli = Peli::findOrFail($id);
+        $peli->delete();
+        return response()->json(['ok' => true]);
+    });
 });

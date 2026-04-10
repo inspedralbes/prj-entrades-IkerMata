@@ -6,7 +6,8 @@ TRUNCATE compres_entrades, reserves_temporals, personal_access_tokens, preus_ses
 -- Users de test (contrasenya: password)
 -- Hash bcrypt generat amb Hash::make('password') (PHP 8.4); l'antic hash de documentació Laravel no verifica bé.
 INSERT INTO users (id, nom, email, password, rol, email_verified_at) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$N2Auy7BkTuhUBuuljRsw1OG3YDibzVvt9ZJEPbJhksiK/n8QpsR/C', 'client', NULL);
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Usuari Test', 'test@example.com', '$2y$12$N2Auy7BkTuhUBuuljRsw1OG3YDibzVvt9ZJEPbJhksiK/n8QpsR/C', 'client', NULL),
+('b1eebc99-9c0b-4ef8-bb6d-6bb9bd380a21', 'Admin Cine', 'admin@cine.com', '$2y$12$N2Auy7BkTuhUBuuljRsw1OG3YDibzVvt9ZJEPbJhksiK/n8QpsR/C', 'admin', NULL);
 
 -- Categories de seients (només VIP i Normal)
 INSERT INTO categories_seients (id, nom, color_hex) VALUES

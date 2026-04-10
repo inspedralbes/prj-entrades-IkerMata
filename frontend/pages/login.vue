@@ -15,7 +15,11 @@ async function enviar() {
   pending.value = true
   try {
     await authStore.login(email.value, password.value)
-    navigateTo('/')
+    if (authStore.user?.rol === 'admin') {
+      navigateTo('/admin')
+    } else {
+      navigateTo('/')
+    }
   } catch (e) {
     if (e.data && e.data.missatge) {
       errorMsg.value = e.data.missatge
