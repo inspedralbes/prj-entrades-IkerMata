@@ -13,7 +13,8 @@ concurrency:
 
 env:
   NODE_VERSION: "20"
-  PHP_VERSION: "8.3"
+  # Debe coincidir con docker/php/Dockerfile (8.4) y con composer.lock (Symfony 8 → PHP >= 8.4).
+  PHP_VERSION: "8.4"
 
 jobs:
   frontend:
