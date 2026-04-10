@@ -57,7 +57,15 @@ services:
       - ./base_de_dades/sql:/docker-entrypoint-initdb.d
     environment:
       # Dins Docker el Postgres és el servei `db`, no 127.0.0.1 (això sobreescriu DB_HOST del .env si està malament).
+      # DB_CONNECTION per defecte a config/database.php és sqlite; sense això Laravel intenta database.sqlite i petarà.
+      - DB_CONNECTION=pgsql
       - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=secret
+      - CACHE_STORE=file
+      - SESSION_DRIVER=file
       - REDIS_HOST=redis
       - REDIS_CLIENT=predis
       # Mateix canal Redis pub/sub que el gateway (sense prefix per defecte de Laravel)
@@ -86,7 +94,14 @@ services:
       - ./backend-laravel:/var/www
     entrypoint: ['php', 'artisan', 'schedule:work']
     environment:
+      - DB_CONNECTION=pgsql
       - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=secret
+      - CACHE_STORE=file
+      - SESSION_DRIVER=file
       - REDIS_HOST=redis
       - REDIS_CLIENT=predis
       - REDIS_PREFIX=
