@@ -23,6 +23,10 @@ export default defineNuxtConfig({
     '/registre': { ssr: false }
   },
   vite: {
+    // Dev darrere de Nginx: el Host és el domini públic; si no, Vite respon 403.
+    server: {
+      allowedHosts: true,
+    },
     optimizeDeps: {
       include: ['socket.io-client']
     }
