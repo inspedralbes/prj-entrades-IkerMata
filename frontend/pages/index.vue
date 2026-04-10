@@ -63,7 +63,7 @@ onUnmounted(() => {
 <template>
   <div>
     <main>
-      <h1>Cartelera</h1>
+      <h1>Cartelero</h1>
       <div v-if="pending">Carregant...</div>
       <div v-else-if="error">Error carregant dades</div>
       <div v-else class="movies-grid">

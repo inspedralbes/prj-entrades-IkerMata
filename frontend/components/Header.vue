@@ -11,7 +11,7 @@ async function tancarSessio() {
 <template>
   <header>
     <nav>
-      <NuxtLink to="/">Cartelera</NuxtLink>
+      <NuxtLink to="/">Cartelero</NuxtLink>
       <NuxtLink to="/mis-entrades">Mis entrades</NuxtLink>
       <span v-if="token" class="user">
         <span v-if="user">{{ user.nom }}</span>
