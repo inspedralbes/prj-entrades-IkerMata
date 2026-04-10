@@ -55,8 +55,11 @@ jobs:
           extensions: mbstring, intl, bcmath, ctype, xml, dom, fileinfo, pdo_sqlite, zip, openssl, curl
           coverage: none
 
-      - name: Copy env for CI (antes de composer: post-install ejecuta artisan)
-        run: cp .env.example .env
+      - name: Copy env for CI (sqlite en memoria; .env.example apunta a pgsql/db que no existe en Actions)
+        run: |
+          cp .env.example .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=:memory:/' .env
 
       - name: Get Composer cache dir
         id: composer-cache
