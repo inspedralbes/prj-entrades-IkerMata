@@ -6,6 +6,7 @@ export default defineNuxtConfig({
   pinia: {
     autoImports: ['defineStore', 'storeToRefs'],
   },
+  // Sobreescriptible amb NUXT_PUBLIC_API_BASE i NUXT_PUBLIC_GATEWAY_URL (veure docker-compose).
   runtimeConfig: {
     public: {
       apiBase: 'http://localhost:8001/api',

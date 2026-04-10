@@ -12,7 +12,11 @@ services:
       - /usr/src/app/node_modules
     environment:
       - NODE_ENV=development
-      - GATEWAY_URL=http://localhost:3003
+      # Des del navegador cal la IP o domini del servidor (no localhost). Definir a .env a l'arrel del projecte:
+      # NUXT_PUBLIC_API_BASE=http://IP:8001/api
+      # NUXT_PUBLIC_GATEWAY_URL=http://IP:3003
+      - NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE:-http://localhost:8001/api}
+      - NUXT_PUBLIC_GATEWAY_URL=${NUXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
     networks:
       - ticket-net
     depends_on:
