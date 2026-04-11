@@ -18,14 +18,16 @@ var subscriber = null;
 var CHANNELS = {
     SESSIO: 'sessio',
     PELICULA: 'pelicula',
-    GLOBAL: 'temps-real'
+    GLOBAL: 'temps-real',
+    CATALOG: 'catalog'
 };
 
 var EVENTS = {
     COMPRA_CREADA: 'compra:creada',
     SEIENT_SELECCIONAT: 'seient:seleccionat',
     SEIENT_ALLIBERAT: 'seient:alliberat',
-    AFORO_ACTUALITZAT: 'aforo:actualitzat'
+    AFORO_ACTUALITZAT: 'aforo:actualitzat',
+    CATALOG_ACTUALITZAT: 'catalog:actualitzat'
 };
 
 //==============================================================================

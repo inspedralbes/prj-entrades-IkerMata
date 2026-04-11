@@ -1,6 +1,7 @@
 <?php
 
 use App\Services\AforoService;
+use App\Services\TempsRealService;
 use App\Support\SeientTemporalEstat;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -156,6 +157,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'durada_minuts' => 'required|integer|min:1',
             'estat' => 'nullable|in:actiu,inactiu'
         ]));
+        TempsRealService::notificarCatalogPelicules();
+
         return response()->json($peli, 201);
     });
 
@@ -172,6 +175,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'durada_minuts' => 'sometimes|integer|min:1',
             'estat' => 'nullable|in:actiu,inactiu'
         ]));
+        TempsRealService::notificarCatalogPelicules();
+
         return response()->json($peli);
     });
 
@@ -182,6 +187,8 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $peli = Peli::findOrFail($id);
         $peli->delete();
+        TempsRealService::notificarCatalogPelicules();
+
         return response()->json(['ok' => true]);
     });
 
@@ -224,6 +231,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         $sessio->load('sala');
 
+        TempsRealService::notificarCatalogSessions((int) $peliId);
+
         return response()->json([
             'id' => $sessio->id,
             'uuid' => $sessio->uuid,
@@ -249,6 +258,8 @@ Route::middleware('auth:sanctum')->group(function () {
         $sessio->update($dades);
         $sessio->load('sala');
 
+        TempsRealService::notificarCatalogSessions((int) $sessio->esdeveniment_id);
+
         return response()->json([
             'id' => $sessio->id,
             'uuid' => $sessio->uuid,
@@ -272,7 +283,10 @@ Route::middleware('auth:sanctum')->group(function () {
             ], 422);
         }
 
+        $peliculaId = (int) $sessio->esdeveniment_id;
         $sessio->delete();
+
+        TempsRealService::notificarCatalogSessions($peliculaId);
 
         return response()->json(['ok' => true]);
     });

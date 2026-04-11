@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\Redis;
 const CHANNEL_SESSIO = 'sessio';
 const CHANNEL_PELICULA = 'pelicula';
 const CHANNEL_GLOBAL = 'temps-real';
+const CHANNEL_CATALOG = 'catalog';
 
 const EVENT_COMPRA_CREADA = 'compra:creada';
 const EVENT_SEIENT_SELECCIONAT = 'seient:seleccionat';
 const EVENT_SEIENT_ALLIBERAT = 'seient:alliberat';
 const EVENT_AFORO_ACTUALITZAT = 'aforo:actualitzat';
+const EVENT_CATALOG_ACTUALITZAT = 'catalog:actualitzat';
 
 //================================ MÈTODES / FUNCIONS ============
 
@@ -83,5 +85,22 @@ class TempsRealService
         $hiHa = AforoService::peliculaTeDisponibilitat($peliId);
 
         self::notificarAforoActualitzat($peliId, $sessioId, $aforo, $hiHa);
+    }
+
+    /** Cartellera / admin: llista de pel·lícules ha canviat. */
+    public static function notificarCatalogPelicules(): void
+    {
+        self::publish(CHANNEL_CATALOG, EVENT_CATALOG_ACTUALITZAT, [
+            'scope' => 'peliculas',
+        ]);
+    }
+
+    /** Sessions d’una pel·lícula (passis) creades / editades / eliminades. */
+    public static function notificarCatalogSessions(int $peliculaId): void
+    {
+        self::publish(CHANNEL_CATALOG, EVENT_CATALOG_ACTUALITZAT, [
+            'scope' => 'sesiones',
+            'pelicula_id' => $peliculaId,
+        ]);
     }
 }

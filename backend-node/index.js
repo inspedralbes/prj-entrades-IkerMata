@@ -206,6 +206,15 @@ function onRedisPeliculaChannel(event, data) {
 redisClient.subscribe(redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
 redisClient.subscribe(LARAVEL_DEFAULT_PUBSUB_PREFIX + redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
 
+function onRedisCatalogChannel(event, data) {
+    if (event === redisClient.EVENTS.CATALOG_ACTUALITZAT) {
+        io.emit('catalog-actualitzat', data);
+    }
+}
+
+redisClient.subscribe(redisClient.CHANNELS.CATALOG, onRedisCatalogChannel);
+redisClient.subscribe(LARAVEL_DEFAULT_PUBSUB_PREFIX + redisClient.CHANNELS.CATALOG, onRedisCatalogChannel);
+
 //==============================================================================
 //================================ SOCKET.IO ================================
 //==============================================================================
