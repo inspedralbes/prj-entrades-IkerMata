@@ -36,7 +36,7 @@ class AdminInformesController extends Controller
             ->orderBy('data_hora')
             ->get();
 
-        $perSessio = $sessions->map(function (Sessio $s) {
+        $perSessio = $sessions->map(function (Sessio $s) use ($ara) {
             $sid = (int) $s->id;
             $capacitat = (int) ($s->sala?->capacitat ?? 0);
             $venuts = CompraEntrada::where('sessio_id', $sid)->count();
