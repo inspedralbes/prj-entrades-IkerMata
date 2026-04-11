@@ -46,7 +46,7 @@ app.get('/health/redis', function (req, res) {
     });
 });
 
-// Reserva temporal: reenvia Bearer i, si OK, emet Socket.io a la sala (no depèn només de Redis).
+// Reserva temporal: Laravel és l'autoritat; temps real via Redis → subscriber (evita doble emissió).
 app.post('/api/reservar', function (req, res) {
     var headers = {
         'Content-Type': 'application/json',
@@ -57,23 +57,8 @@ app.post('/api/reservar', function (req, res) {
     }
     axios.post(LARAVEL_API_URL + '/reservar', req.body, { headers: headers })
         .then(function (response) {
-            if ((response.status === 200 || response.status === 201) && response.data && response.data.ok) {
-                var d = response.data;
-                if (d.sessio_id != null && d.seient_id != null) {
-                    var room = 'sessio:' + String(d.sessio_id);
-                    if (d.reserva_activa) {
-                        io.to(room).emit('seient-seleccionat', {
-                            sessio_id: d.sessio_id,
-                            seient_id: d.seient_id,
-                            usuari_id: d.usuari_id
-                        });
-                    } else {
-                        io.to(room).emit('seient-alliberat', {
-                            sessio_id: d.sessio_id,
-                            seient_id: d.seient_id
-                        });
-                    }
-                }
+            if (response.data && response.data.ok) {
+                notifyAdminPanellRefresh('reserva-http');
             }
             res.status(response.status).json(response.data);
         })
@@ -154,6 +139,7 @@ app.post('/api/comprar', function (req, res) {
                         seient_ids: seientIds
                     });
                 }
+                notifyAdminPanellRefresh('compra-http');
             }
             res.status(response.status).json(response.data);
         })
@@ -181,16 +167,25 @@ function emitToSessioRoom(sessioId, eventName, payload) {
     io.to(room).emit(eventName, payload);
 }
 
+/** Clients a la sala `admin` (panell d’administració) refresquen mètriques sense polling agressiu. */
+function notifyAdminPanellRefresh(reason) {
+    io.to('admin').emit('admin-panell-refresh', { reason: reason || 'sessio', ts: Date.now() });
+}
+
 function onRedisSessioChannel(event, data) {
     console.log('Redis event:', event, data);
     if (event === redisClient.EVENTS.COMPRA_CREADA) {
         emitToSessioRoom(data.sessio_id, 'compra-creada', data);
+        notifyAdminPanellRefresh('compra');
     } else if (event === redisClient.EVENTS.SEIENT_SELECCIONAT) {
         emitToSessioRoom(data.sessio_id, 'seient-seleccionat', data);
+        notifyAdminPanellRefresh('reserva');
     } else if (event === redisClient.EVENTS.SEIENT_ALLIBERAT) {
         emitToSessioRoom(data.sessio_id, 'seient-alliberat', data);
+        notifyAdminPanellRefresh('alliberament');
     } else if (event === redisClient.EVENTS.AFORO_ACTUALITZAT) {
         emitToSessioRoom(data.sessio_id, 'aforo-actualitzat', data);
+        notifyAdminPanellRefresh('aforo');
     }
 }
 
@@ -201,6 +196,7 @@ function onRedisPeliculaChannel(event, data) {
     console.log('Redis pelicula event:', event, data);
     var peliculaId = data.pelicula_id;
     io.to('pelicula:' + String(peliculaId)).emit('aforo-actualitzat', data);
+    notifyAdminPanellRefresh('aforo-pelicula');
 }
 
 redisClient.subscribe(redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
@@ -232,6 +228,46 @@ io.on('connection', function (socket) {
         var room = 'pelicula:' + String(peliculaId);
         socket.join(room);
         console.log('socket', socket.id, 'joined', room);
+    });
+
+    socket.on('unirse-panell-admin', function () {
+        socket.join('admin');
+        console.log('socket', socket.id, 'joined admin panell');
+    });
+
+    /**
+     * Reserva temporal via Socket.IO (ack): mateix cos que POST /api/reservar → Laravel.
+     * El payload.token és el token pla (sense "Bearer "); el gateway afegeix la capçalera.
+     */
+    socket.on('reserva-temporal', function (payload, ack) {
+        if (typeof ack !== 'function') {
+            return;
+        }
+        if (!payload || payload.sessioId == null || payload.seientId == null || typeof payload.estat !== 'boolean') {
+            ack({ ok: false, status: 400, data: { error: 'Payload invàlid' } });
+            return;
+        }
+        var headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+        if (payload.token) {
+            headers['Authorization'] = 'Bearer ' + String(payload.token);
+        }
+        axios.post(LARAVEL_API_URL + '/reservar', {
+            sessioId: payload.sessioId,
+            seientId: payload.seientId,
+            estat: payload.estat
+        }, { headers: headers })
+            .then(function (response) {
+                ack({ ok: true, status: response.status, data: response.data });
+            })
+            .catch(function (error) {
+                var status = error.response ? error.response.status : 500;
+                var data = error.response ? error.response.data : { error: String(error.message || 'Error') };
+                console.error('Gateway: reserva-temporal (socket):', status, data);
+                ack({ ok: false, status: status, data: data });
+            });
     });
 
     socket.on('disconnect', function () {

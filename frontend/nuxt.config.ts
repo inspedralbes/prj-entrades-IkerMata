@@ -9,7 +9,7 @@ export default defineNuxtConfig({
         class: 'dark',
         lang: 'ca'
       },
-      title: 'TICKET-FAST | Cartelera',
+      title: 'TICKET-FAST | Cartellera',
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
       link: [
         { rel: 'icon', type: 'image/png', href: '/favicon.png' },
@@ -43,7 +43,6 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
-    '/': { ssr: false },
     '/sala': { ssr: false },
     '/butaques': { ssr: false },
     '/mis-entrades': { ssr: false },

@@ -21,7 +21,7 @@ async function enviar() {
     if (e.data && e.data.errors) {
       errorMsg.value = 'Revisa les dades (email únic, contrasenya mínim 8 caràcters)'
     } else {
-      errorMsg.value = 'Error en el registre'
+      errorMsg.value = 'No s’ha pogut completar el registre'
     }
   } finally {
     pending.value = false
@@ -44,7 +44,7 @@ async function enviar() {
         <h1
           class="font-headline mb-2 text-center text-3xl font-bold uppercase tracking-tight text-white md:text-4xl"
         >
-          Crear compte
+          Crea un compte
         </h1>
         <p class="mb-8 text-center font-body text-sm text-stone-500">
           Uneix-te a TICKET-FAST en un moment
@@ -107,7 +107,7 @@ async function enviar() {
             :disabled="pending"
             class="font-headline w-full border border-white/10 bg-white py-4 text-sm font-bold uppercase tracking-[0.2em] text-black transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {{ pending ? 'Registrant…' : 'Registrar-se' }}
+            {{ pending ? 'Registrant…' : 'Registra’t' }}
           </button>
         </form>
 
@@ -117,7 +117,7 @@ async function enviar() {
             to="/login"
             class="font-semibold text-primary transition hover:text-red-400"
           >
-            Iniciar sessió
+            Inicia la sessió
           </NuxtLink>
         </p>
       </div>
@@ -126,7 +126,7 @@ async function enviar() {
         to="/"
         class="font-headline mt-10 text-sm uppercase tracking-wider text-stone-500 transition hover:text-white"
       >
-        ← Tornar a la cartelera
+        ← Tornar a la cartellera
       </NuxtLink>
     </main>
   </div>

@@ -34,6 +34,14 @@ export function useSocket() {
     }
   }
 
+  /** Sala `admin` al gateway: mètriques del panell s’actualitzen per esdeveniments Redis/HTTP. */
+  function joinPanellAdmin() {
+    const s = ensureSocket()
+    if (s) {
+      s.emit('unirse-panell-admin')
+    }
+  }
+
   /** Retorna una funció per fer `off` del mateix callback (evita fugues en canviar de pàgina). */
   function onAforoActualitzat(callback) {
     const s = ensureSocket()
@@ -63,13 +71,66 @@ export function useSocket() {
     return () => {}
   }
 
+  /** Panell admin: el gateway emet després de reserves, compres o aforo (Redis o HTTP). */
+  function onAdminPanellRefresh(callback) {
+    const s = ensureSocket()
+    if (s) {
+      s.on('admin-panell-refresh', callback)
+      return () => s.off('admin-panell-refresh', callback)
+    }
+    return () => {}
+  }
+
+  /**
+   * Reserva temporal via Socket.IO amb ack (Laravel com a autoritat al gateway).
+   * Rebutja amb `cause` 'no_socket' | 'timeout_reserva' | 'empty_ack' per permetre fallback HTTP.
+   */
+  function reservarTemporal({ sessioId, seientId, estat, token }) {
+    const s = ensureSocket()
+    if (!s?.connected) {
+      return Promise.reject(Object.assign(new Error('Socket no connectat'), { cause: 'no_socket' }))
+    }
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        reject(Object.assign(new Error('Timeout reserva'), { cause: 'timeout_reserva' }))
+      }, 20000)
+      s.emit(
+        'reserva-temporal',
+        {
+          sessioId,
+          seientId,
+          estat,
+          token: token ?? null
+        },
+        (res) => {
+          clearTimeout(t)
+          if (res == null) {
+            reject(Object.assign(new Error('Resposta buida'), { cause: 'empty_ack' }))
+            return
+          }
+          if (res.ok) {
+            resolve(res.data)
+            return
+          }
+          const err = new Error('Reserva rebutjada')
+          err.statusCode = res.status
+          err.data = res.data
+          reject(err)
+        }
+      )
+    })
+  }
+
   return {
     socket,
     ensureSocket,
     joinSessio,
     joinPelicula,
+    joinPanellAdmin,
     onAforoActualitzat,
     onCompraCreada,
-    onCatalogActualitzat
+    onCatalogActualitzat,
+    onAdminPanellRefresh,
+    reservarTemporal
   }
 }

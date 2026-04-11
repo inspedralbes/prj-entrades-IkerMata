@@ -1,4 +1,7 @@
 <script setup>
+import { storeToRefs } from 'pinia'
+import { useSessioSeientsStore } from '~/stores/sessioSeients'
+
 definePageMeta({
   layout: 'blank'
 })
@@ -8,7 +11,18 @@ const config = useRuntimeConfig()
 const baseURL = useApiBase()
 const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
-const { ensureSocket, joinSessio } = useSocket()
+const sessioStore = useSessioSeientsStore()
+const {
+  llistaSeients: seients,
+  selectedSeients,
+  reservaEnCurs,
+  segonsRestantsReserva,
+  millorExpiracioIso,
+  tempsReservaFormat,
+  socketConnected
+} = storeToRefs(sessioStore)
+
+const { ensureSocket, joinSessio, reservarTemporal } = useSocket()
 
 const peliId = route.query.peli
 const sessioId = route.query.sessio
@@ -17,38 +31,54 @@ function mateixaSessio(id) {
   return id != null && Number(id) === Number(sessioId)
 }
 
-const MAX_PENDING_SOCKET_EVENTS = 64
-const pendingSeatSocketEvents = ref([])
-
-function patchSeient(seientId, patch) {
-  const list = seients.value
-  if (!list || !list.length) return
-  const id = Number(seientId)
-  const i = list.findIndex((s) => Number(s.id) === id)
-  if (i === -1) return
-  seients.value = list.map((s, idx) => (idx === i ? { ...s, ...patch } : s))
-}
-
-function enqueueSeatSocketEvent(kind, data) {
-  if (pendingSeatSocketEvents.value.length < MAX_PENDING_SOCKET_EVENTS) {
-    pendingSeatSocketEvents.value.push({ kind, data })
-  }
-}
-
-function flushPendingSeatSocketEvents() {
-  if (!seients.value || seatsLoading.value || pendingSeatSocketEvents.value.length === 0) {
+function processSeientSeleccionat(data) {
+  if (!mateixaSessio(data.sessio_id)) {
     return
   }
-  const batch = pendingSeatSocketEvents.value.splice(0)
-  for (const ev of batch) {
-    if (ev.kind === 'seleccionat') {
-      processSeientSeleccionat(ev.data)
-    } else if (ev.kind === 'alliberat') {
-      processSeientAlliberat(ev.data)
-    } else if (ev.kind === 'compra') {
-      processCompraCreada(ev.data)
-    }
+  const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
+  const actor = data.usuari_id != null ? String(data.usuari_id) : ''
+  if (jo && actor === jo) {
+    return
   }
+  if (!jo && selectedSeients.value.some((s) => Number(s.id) === Number(data.seient_id))) {
+    return
+  }
+  sessioStore.patchSeient(data.seient_id, { seleccionat_per_altre: true })
+}
+
+function processSeientAlliberat(data) {
+  if (!mateixaSessio(data.sessio_id)) {
+    return
+  }
+  sessioStore.patchSeient(data.seient_id, { seleccionat_per_altre: false })
+}
+
+function processCompraCreada(data) {
+  sessioStore.processCompraCreadaLocal(data, mateixaSessio)
+}
+
+function onSeientSeleccionat(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('seleccionat', data)
+    return
+  }
+  processSeientSeleccionat(data)
+}
+
+function onSeientAlliberat(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('alliberat', data)
+    return
+  }
+  processSeientAlliberat(data)
+}
+
+function onCompraCreada(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('compra', data)
+    return
+  }
+  processCompraCreada(data)
 }
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
@@ -56,11 +86,31 @@ const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/ses
   baseURL,
   immediate: !!peliId
 })
-const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
-  baseURL,
-  immediate: !!sessioId,
-  headers: computed(() => authStore.capcalarsAutenticacio())
-})
+const { data: vendaConfig } = await useFetch('/configuracio-venda', { baseURL })
+const { data: seientsApi, pending: seatsLoading, refresh: refreshSeats } = await useFetch(
+  sessioId ? `/sesiones/${sessioId}/asientos` : null,
+  {
+    baseURL,
+    immediate: !!sessioId,
+    headers: computed(() => authStore.capcalarsAutenticacio())
+  }
+)
+
+watch(
+  seientsApi,
+  (list) => {
+    sessioStore.aplicaLlistaDesDelServidor(list)
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  () => [route.query.peli, route.query.sessio],
+  () => {
+    sessioStore.initForSessio(route.query.peli, route.query.sessio)
+  },
+  { immediate: true }
+)
 
 const sessioActual = computed(() => {
   const list = sessionsList.value
@@ -80,63 +130,45 @@ function formatSessioEtiqueta(sessio) {
   return `${sala} · ${t}`
 }
 
-const selectedSeients = ref([])
-const reservaEnCurs = ref(false)
+const maxSeientsPermesos = computed(() => vendaConfig.value?.max_seients_per_sessio ?? 8)
 
-function processSeientSeleccionat(data) {
-  if (!mateixaSessio(data.sessio_id)) return
-  const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
-  const actor = data.usuari_id != null ? String(data.usuari_id) : ''
-  if (jo && actor === jo) {
-    return
-  }
-  if (!jo && selectedSeients.value.some((s) => Number(s.id) === Number(data.seient_id))) {
-    return
-  }
-  patchSeient(data.seient_id, { seleccionat_per_altre: true })
-}
+watch(
+  () => sessioStore.millorExpiracioIso,
+  () => {
+    sessioStore.actualitzaSegonsReserva()
+  },
+  { immediate: true }
+)
 
-function onSeientSeleccionat(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('seleccionat', data)
-    return
-  }
-  processSeientSeleccionat(data)
-}
-
-function processSeientAlliberat(data) {
-  if (!mateixaSessio(data.sessio_id)) return
-  patchSeient(data.seient_id, { seleccionat_per_altre: false })
-}
-
-function onSeientAlliberat(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('alliberat', data)
-    return
-  }
-  processSeientAlliberat(data)
-}
-
-function processCompraCreada(data) {
-  if (!mateixaSessio(data.sessio_id) || !data.seient_ids) return
-  const ids = new Set(data.seient_ids.map((id) => Number(id)))
-  for (const id of ids) {
-    patchSeient(id, { reservat: true, seleccionat_per_altre: false })
-  }
-  selectedSeients.value = selectedSeients.value.filter((s) => !ids.has(s.id))
-}
-
-function onCompraCreada(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('compra', data)
-    return
-  }
-  processCompraCreada(data)
-}
+let tickReservaInterval = null
 
 function rejoinSalaAlConnectar() {
   if (sessioId) {
     joinSessio(sessioId)
+  }
+  const s = ensureSocket()
+  if (s) {
+    sessioStore.setSocketConnected(s.connected)
+  }
+}
+
+async function cridarReservarTemporal(body) {
+  try {
+    return await reservarTemporal({
+      sessioId: body.sessioId,
+      seientId: body.seientId,
+      estat: body.estat,
+      token: authStore.token
+    })
+  } catch (e) {
+    if (e.cause === 'no_socket' || e.cause === 'timeout_reserva' || e.cause === 'empty_ack') {
+      return await $fetch(`${gatewayURL}/api/reservar`, {
+        method: 'POST',
+        headers: authStore.capcalarsAutenticacio(),
+        body
+      })
+    }
+    throw e
   }
 }
 
@@ -147,18 +179,15 @@ async function alliberarReservesSeleccionades() {
   }
   await Promise.all(
     seats.map((seient) =>
-      $fetch(`${gatewayURL}/api/reservar`, {
-        method: 'POST',
-        headers: authStore.capcalarsAutenticacio(),
-        body: {
-          sessioId,
-          seientId: seient.id,
-          estat: false
-        }
+      cridarReservarTemporal({
+        sessioId,
+        seientId: seient.id,
+        estat: false
       }).catch(() => {})
     )
   )
-  selectedSeients.value = []
+  sessioStore.buidaSeleccio()
+  await refreshSeats()
 }
 
 function vaAPagament(to) {
@@ -173,26 +202,47 @@ onBeforeRouteLeave(async (to) => {
   await alliberarReservesSeleccionades()
 })
 
+function actualitzaConnexioSocket() {
+  const s = ensureSocket()
+  if (s) {
+    sessioStore.setSocketConnected(s.connected)
+  }
+}
+
 onMounted(async () => {
   await authStore.syncUsuariSiCal(baseURL)
 
   const socket = ensureSocket()
-  if (!socket) return
+  if (!socket) {
+    return
+  }
 
   socket.on('connect', rejoinSalaAlConnectar)
+  socket.on('disconnect', actualitzaConnexioSocket)
   socket.on('seient-seleccionat', onSeientSeleccionat)
   socket.on('seient-alliberat', onSeientAlliberat)
   socket.on('compra-creada', onCompraCreada)
 
+  actualitzaConnexioSocket()
+
   if (sessioId) {
     joinSessio(sessioId)
   }
+
+  tickReservaInterval = setInterval(() => sessioStore.actualitzaSegonsReserva(), 1000)
 })
 
 onUnmounted(() => {
+  if (tickReservaInterval) {
+    clearInterval(tickReservaInterval)
+    tickReservaInterval = null
+  }
   const socket = ensureSocket()
-  if (!socket) return
+  if (!socket) {
+    return
+  }
   socket.off('connect', rejoinSalaAlConnectar)
+  socket.off('disconnect', actualitzaConnexioSocket)
   socket.off('seient-seleccionat', onSeientSeleccionat)
   socket.off('seient-alliberat', onSeientAlliberat)
   socket.off('compra-creada', onCompraCreada)
@@ -205,39 +255,51 @@ async function toggleSeient(seient) {
   const index = selectedSeients.value.findIndex((s) => s.id === seient.id)
   const nouEstat = index === -1
 
-  reservaEnCurs.value = true
+  if (nouEstat && selectedSeients.value.length >= maxSeientsPermesos.value) {
+    alert(`Només pots seleccionar fins a ${maxSeientsPermesos.value} seients per sessió.`)
+    return
+  }
+
+  sessioStore.setReservaEnCurs(true)
   try {
-    await $fetch(`${gatewayURL}/api/reservar`, {
-      method: 'POST',
-      headers: authStore.capcalarsAutenticacio(),
-      body: {
-        sessioId: sessioId,
-        seientId: seient.id,
-        estat: nouEstat
-      }
+    await cridarReservarTemporal({
+      sessioId: sessioId,
+      seientId: seient.id,
+      estat: nouEstat
     })
 
     if (nouEstat) {
-      if (!selectedSeients.value.some((s) => s.id === seient.id)) {
-        selectedSeients.value.push(seient)
-      }
+      sessioStore.afegirSeleccionat(seient)
     } else {
-      selectedSeients.value.splice(index, 1)
+      sessioStore.treureSeleccionatPerId(seient.id)
     }
+    await refreshSeats()
   } catch (e) {
-    if (e.response && e.response.status === 401) {
+    const status = e.statusCode ?? e.status ?? e.response?.status
+    const msg = e.data?.error ?? e.response?._data?.error
+    if (status === 401) {
       await authStore.logout()
       navigateTo('/login')
+    } else if (status === 422) {
+      alert(msg || 'Límit de seients assolit.')
+      refreshSeats()
     } else {
-      alert(e.data?.error || 'No s\'ha pogut reservar el seient')
+      alert(msg || 'No s\'ha pogut reservar el seient')
       refreshSeats()
     }
   } finally {
-    reservaEnCurs.value = false
+    sessioStore.setReservaEnCurs(false)
   }
 }
 
 function getPreu(categoria) {
+  const preus = sessioActual.value?.preus
+  if (preus?.length) {
+    const row = preus.find((p) => p.categoria === categoria)
+    if (row) {
+      return parseFloat(row.preu, 10)
+    }
+  }
   if (categoria === 'VIP') return 9.7
   return 6.7
 }
@@ -272,6 +334,13 @@ const textButaquesSeleccionades = computed(() => {
 
 function anarAPagament() {
   const ids = selectedSeients.value.map((s) => s.id).join(',')
+  if (millorExpiracioIso.value && typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem(`ticketfast_expira_${sessioId}`, millorExpiracioIso.value)
+    } catch (_) {
+      /* ignore */
+    }
+  }
   navigateTo({
     path: '/pago',
     query: {
@@ -285,29 +354,27 @@ function anarAPagament() {
 watch(
   () => route.query.sessio,
   () => {
-    selectedSeients.value = []
+    sessioStore.buidaSeleccio()
   }
 )
 
 watch(
   () => seients.value,
   (list) => {
-    if (!list || !Array.isArray(list) || selectedSeients.value.length > 0) {
-      return
-    }
-    const mine = list.filter((s) => s.la_meva_reserva)
-    if (mine.length) {
-      selectedSeients.value = mine.slice()
-    }
+    sessioStore.setSelectedFromHydration(list)
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 )
 
 watch([seients, seatsLoading], () => {
-  flushPendingSeatSocketEvents()
+  sessioStore.flushPendingSeatSocketEvents(
+    seatsLoading.value,
+    processSeientSeleccionat,
+    processSeientAlliberat,
+    processCompraCreada
+  )
 })
 
-/** Files A…E: la fila A (davant) queda just sota la pantalla. */
 const filesPerMostrar = computed(() => {
   if (!seients.value?.length) {
     return []
@@ -409,6 +476,13 @@ function onClickSeient(seient) {
             />
           </div>
 
+          <p
+            v-if="socketConnected === false"
+            class="mb-4 font-label text-[10px] uppercase tracking-widest text-amber-500/90"
+          >
+            Connexió en temps real: reconnectant…
+          </p>
+
           <div v-if="seatsLoading" class="py-16 font-headline text-sm uppercase tracking-[0.2em] text-stone-500">
             Carregant seients…
           </div>
@@ -448,13 +522,13 @@ function onClickSeient(seient) {
           <div v-if="seients && !seatsLoading" class="mt-8 flex flex-wrap justify-center gap-8 md:gap-12">
             <div class="flex items-center gap-3">
               <div class="h-5 w-5 border border-outline-variant/20 bg-surface-container-highest" />
-              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Disponible</span>
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Lliure</span>
             </div>
             <div class="flex items-center gap-3">
               <div
                 class="h-5 w-5 border border-primary bg-secondary-container shadow-[0_0_10px_rgba(255,180,168,0.3)]"
               />
-              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Seleccionat</span>
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Triat</span>
             </div>
             <div class="flex items-center gap-3">
               <div class="h-5 w-5 bg-surface-container-low opacity-40" />
@@ -491,6 +565,25 @@ function onClickSeient(seient) {
               </div>
             </div>
 
+            <p class="mb-4 font-body text-xs text-stone-500">
+              Màxim {{ maxSeientsPermesos }} seients per sessió (configuració del sistema).
+            </p>
+
+            <div
+              v-if="millorExpiracioIso && segonsRestantsReserva > 0"
+              class="mb-8 flex items-center gap-3 border border-primary/30 bg-black/30 px-4 py-3"
+            >
+              <span class="material-symbols-outlined text-primary" aria-hidden="true">timer</span>
+              <div>
+                <p class="font-label text-[9px] uppercase tracking-widest text-stone-500">
+                  Temps per finalitzar la reserva
+                </p>
+                <p class="font-mono text-2xl font-black text-primary">
+                  {{ tempsReservaFormat }}
+                </p>
+              </div>
+            </div>
+
             <div class="mb-10 space-y-0">
               <div class="flex items-center justify-between border-b border-white/10 py-4">
                 <span class="font-label text-xs uppercase tracking-widest text-stone-400">Butaques</span>
@@ -513,7 +606,7 @@ function onClickSeient(seient) {
                 :disabled="selectedSeients.length === 0 || reservaEnCurs"
                 @click="anarAPagament"
               >
-                Confirmar reserva
+                Confirmar la reserva
               </button>
               <NuxtLink
                 :to="`/sala?peli=${peliId}`"
@@ -557,11 +650,11 @@ function onClickSeient(seient) {
           to="/"
           class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Sales</span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Suport</span>
       </div>
       <div class="h-px w-full max-w-4xl bg-gradient-to-r from-transparent via-stone-800 to-transparent" />
       <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
@@ -576,7 +669,7 @@ function onClickSeient(seient) {
         :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartellera</span>
       </NuxtLink>
       <NuxtLink
         to="/mis-entrades"
@@ -584,7 +677,7 @@ function onClickSeient(seient) {
         :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Les meves entrades</span>
       </NuxtLink>
     </div>
   </div>

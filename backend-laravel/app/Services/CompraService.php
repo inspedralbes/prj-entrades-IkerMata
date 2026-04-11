@@ -51,6 +51,26 @@ class CompraService
             return $resultat;
         }
 
+        $maxSeients = (int) config('entradas.max_seients_per_sessio');
+        $idsNumerics = [];
+        foreach ($seientIds as $seientIdBrut) {
+            if (is_int($seientIdBrut)) {
+                $idsNumerics[] = $seientIdBrut;
+            } elseif (is_numeric($seientIdBrut)) {
+                $idsNumerics[] = (int) $seientIdBrut;
+            }
+        }
+        if (count($idsNumerics) !== count(array_unique($idsNumerics))) {
+            $resultat['missatge'] = 'No es poden repetir seients a la mateixa compra';
+
+            return $resultat;
+        }
+        if (count($idsNumerics) > $maxSeients) {
+            $resultat['missatge'] = 'Com a màxim es poden comprar '.$maxSeients.' seients per sessió.';
+
+            return $resultat;
+        }
+
         DB::beginTransaction();
 
         try {

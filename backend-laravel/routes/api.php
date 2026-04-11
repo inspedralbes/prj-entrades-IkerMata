@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\PersonalAccessToken;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminInformesController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\EntradaController;
 use App\Models\CategoriaSeient;
@@ -53,16 +54,26 @@ Route::get('/peliculas', function () {
     });
 });
 
+Route::get('/configuracio-venda', function () {
+    return response()->json([
+        'max_seients_per_sessio' => (int) config('entradas.max_seients_per_sessio'),
+        'reserva_temporal_minuts' => (int) config('entradas.reserva_temporal_minuts'),
+    ]);
+});
+
 Route::get('/peliculas/{id}', function ($id) {
     $p = Peli::find($id);
     if (! $p) {
         return response()->json(['error' => 'Pelicula no encontrada'], 404);
     }
+
     return [
         'id' => $p->id,
         'titol' => $p->titol,
         'imatge_url' => $p->imatge_url,
-        'descripcio' => $p->descripcio
+        'descripcio' => $p->descripcio,
+        'durada_minuts' => $p->durada_minuts,
+        'estat' => $p->estat,
     ];
 });
 
@@ -76,16 +87,27 @@ Route::get('/debug-sessions', function () {
 });
 
 Route::get('/peliculas/{id}/sesiones', function ($id) {
-    return Sessio::where('esdeveniment_id', $id)->with('sala')->get()->map(function ($s) {
-        return [
-            'id' => $s->id,
-            'uuid' => $s->uuid,
-            'sala_id' => $s->sala_id,
-            'sala_nom' => $s->sala->nom,
-            'data_hora' => $s->data_hora,
-            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $s->id),
-        ];
-    });
+    return Sessio::where('esdeveniment_id', $id)
+        ->with(['sala', 'preus.categoria'])
+        ->get()
+        ->map(function ($s) {
+            $preus = $s->preus->map(function ($ps) {
+                return [
+                    'categoria' => $ps->categoria?->nom ?? '—',
+                    'preu' => (string) $ps->preu,
+                ];
+            });
+
+            return [
+                'id' => $s->id,
+                'uuid' => $s->uuid,
+                'sala_id' => $s->sala_id,
+                'sala_nom' => $s->sala->nom,
+                'data_hora' => $s->data_hora,
+                'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $s->id),
+                'preus' => $preus,
+            ];
+        });
 });
 
 Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
@@ -123,7 +145,7 @@ Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
         $reserva = $reserves->firstWhere('seient_id', $s->id);
         $temporal = SeientTemporalEstat::flags($isVenut, $reserva, $authUserId);
 
-        return [
+        $fila = [
             'id' => $s->id,
             'fila' => $s->fila,
             'numero' => $s->numero,
@@ -133,6 +155,12 @@ Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
             'seleccionat_per_altre' => $temporal['seleccionat_per_altre'],
             'la_meva_reserva' => $temporal['la_meva_reserva'],
         ];
+
+        if ($temporal['la_meva_reserva'] && $reserva !== null && $reserva->expires_at !== null) {
+            $fila['meva_expiracio_iso'] = $reserva->expires_at->toIso8601String();
+        }
+
+        return $fila;
     });
 });
 
@@ -141,8 +169,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/usuari', [AuthController::class, 'usuari']);
     Route::get('/entrades', [EntradaController::class, 'indexAutenticat']);
     Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
-    Route::post('/comprar', [CompraController::class, 'desar']);
-    Route::post('/reservar', [CompraController::class, 'reservarTemporal']);
+    Route::post('/comprar', [CompraController::class, 'desar'])->middleware('throttle:comprar');
+    Route::post('/reservar', [CompraController::class, 'reservarTemporal'])->middleware('throttle:reservar');
+
+    Route::get('/admin/panell-temps-real', [AdminInformesController::class, 'panellTempsReal']);
+    Route::get('/admin/informes-resum', [AdminInformesController::class, 'informesResum']);
 
     // Rutes Admin - CRUD Pel·lícules
     Route::post('/peliculas', function (Illuminate\Http\Request $request) {

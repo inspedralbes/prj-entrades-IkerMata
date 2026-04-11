@@ -16,8 +16,9 @@ RUN apk add --no-cache \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Composer: instal·lació oficial (evita `COPY --from=composer:latest`, que depèn d’una segona imatge i sovint falla amb la CDN de Docker Hub / xarxa).
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
+    && chmod +x /usr/local/bin/composer
 
 # Set working directory
 WORKDIR /var/www

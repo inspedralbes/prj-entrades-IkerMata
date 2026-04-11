@@ -74,7 +74,7 @@ const qrSrc = computed(() => {
           <span class="block text-primary">digital</span>
         </h1>
         <p class="font-headline mt-4 text-xl font-bold uppercase tracking-[0.2em] text-stone-400 md:text-2xl">
-          Mis entradas
+          Les meves entrades
         </p>
       </header>
 
@@ -277,11 +277,11 @@ const qrSrc = computed(() => {
           to="/"
           class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Sales</span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Suport</span>
       </div>
       <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
         © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.
@@ -295,7 +295,7 @@ const qrSrc = computed(() => {
         :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartellera</span>
       </NuxtLink>
       <NuxtLink
         to="/mis-entrades"
@@ -303,7 +303,7 @@ const qrSrc = computed(() => {
         :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Les meves entrades</span>
       </NuxtLink>
     </div>
   </div>

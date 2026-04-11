@@ -110,21 +110,40 @@ class CompraController extends Controller
                 return response()->json(['error' => 'Seient ja reservat per un altre usuari'], 409);
             }
 
-            // Crear o renovar reserva
-            \App\Models\ReservaTemporal::updateOrCreate(
-                ['sessio_id' => $sessioId, 'seient_id' => $seientId, 'usuari_id' => $usuari->id],
-                ['expires_at' => now()->addMinutes(10)]
+            $max = config('entradas.max_seients_per_sessio');
+            $minuts = config('entradas.reserva_temporal_minuts');
+            $usuariIdStr = (string) $usuari->id;
+
+            $mevesActives = \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                ->where('usuari_id', $usuariIdStr)
+                ->where('expires_at', '>', now());
+            $jaTincAquestSeient = (clone $mevesActives)->where('seient_id', $seientId)->exists();
+            $nMeves = $mevesActives->count();
+
+            if (! $jaTincAquestSeient && $nMeves >= $max) {
+                return response()->json([
+                    'error' => 'Has arribat al màxim de seients seleccionables per aquesta sessió ('.$max.').',
+                ], 422);
+            }
+
+            $expiresAt = now()->addMinutes($minuts);
+
+            $fila = \App\Models\ReservaTemporal::updateOrCreate(
+                ['sessio_id' => $sessioId, 'seient_id' => $seientId, 'usuari_id' => $usuariIdStr],
+                ['expires_at' => $expiresAt]
             );
 
-            TempsRealService::notificarSeleccionat($sessioId, $seientId, (string) $usuari->id);
+            TempsRealService::notificarSeleccionat($sessioId, $seientId, $usuariIdStr);
 
             return response()->json([
                 'ok' => true,
                 'missatge' => 'Seient reservat temporalment',
                 'sessio_id' => (int) $sessioId,
                 'seient_id' => (int) $seientId,
-                'usuari_id' => (string) $usuari->id,
+                'usuari_id' => $usuariIdStr,
                 'reserva_activa' => true,
+                'expires_at' => $fila->expires_at->toIso8601String(),
+                'reserva_minuts' => $minuts,
             ]);
         } else {
             // Alliberar reserva

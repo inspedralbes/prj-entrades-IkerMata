@@ -11,13 +11,18 @@ async function tancarSessio() {
 <template>
   <header>
     <nav>
+<<<<<<< HEAD
       <NuxtLink to="/">Cartelero</NuxtLink>
       <NuxtLink to="/mis-entrades">Mis entrades</NuxtLink>
+=======
+      <NuxtLink to="/">Cartellera</NuxtLink>
+      <NuxtLink to="/mis-entrades">Les meves entrades</NuxtLink>
+>>>>>>> dev
       <span v-if="token" class="user">
         <span v-if="user">{{ user.nom }}</span>
         <button type="button" class="link-btn" @click="tancarSessio">Tancar sessió</button>
       </span>
-      <NuxtLink v-else to="/login" class="login-link">Iniciar sessió</NuxtLink>
+      <NuxtLink v-else to="/login" class="login-link">Inicia la sessió</NuxtLink>
     </nav>
   </header>
 </template>

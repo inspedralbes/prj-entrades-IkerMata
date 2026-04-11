@@ -73,3 +73,29 @@ bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+
+## Tests E2E (Cypress)
+
+Cal tenir el **frontend** i l’**API** (Laravel) en marxa perquè el login pugui fallar correctament.
+
+```bash
+npm install
+# Terminal 1: Nuxt (per defecte Cypress apunta a http://localhost:3000)
+npm run dev
+# Terminal 2:
+npm run cypress:run
+# O interfície gràfica:
+npm run cypress
+```
+
+Amb **Docker** el frontend sol estar a `http://localhost:3002`:
+
+```bash
+set CYPRESS_BASE_URL=http://localhost:3002
+npm run cypress:run
+```
+
+Proves incloses:
+
+- `cypress/e2e/cartelera.cy.ts` — pàgina principal i navegació.
+- `cypress/e2e/login-error.cy.ts` — credencials invàlides i missatge d’error.
