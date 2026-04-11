@@ -161,6 +161,17 @@ const guardantPeli = ref(false)
 const esborrant = ref(false)
 
 const panellTempsReal = ref(null)
+const reservesActivesMostrar = computed(() => {
+  const p = panellTempsReal.value
+  if (!p) {
+    return null
+  }
+  const total = Number(p.reserves_actives_total) || 0
+  const sumaPerSessio = Array.isArray(p.per_sessio)
+    ? p.per_sessio.reduce((acc, row) => acc + (Number(row.seients_reservats_temporalment) || 0), 0)
+    : 0
+  return Math.max(total, sumaPerSessio)
+})
 const informesResum = ref(null)
 const carregantPanell = ref(false)
 const carregantInformes = ref(false)
@@ -511,7 +522,7 @@ function retallDescripcio(t) {
                 Reserves temporals actives
               </p>
               <p class="font-headline text-2xl text-primary">
-                {{ panellTempsReal.reserves_actives_total }}
+                {{ reservesActivesMostrar }}
               </p>
             </div>
             <div>
@@ -523,6 +534,9 @@ function retallDescripcio(t) {
               </p>
             </div>
           </div>
+          <p class="font-body text-[11px] text-stone-500">
+            Valors segons la BD (reserves no caducades). Sense seients seleccionats ara mateix, es mostra 0.
+          </p>
 
           <div class="overflow-x-auto border border-stone-800 bg-black/20">
             <table class="w-full min-w-[720px] border-collapse text-left text-sm">

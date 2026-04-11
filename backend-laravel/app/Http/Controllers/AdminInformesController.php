@@ -21,10 +21,15 @@ class AdminInformesController extends Controller
             return response()->json(['error' => 'Accés denegat'], 403);
         }
 
-        $reservesActives = ReservaTemporal::where('expires_at', '>', now())->count();
-        $usuarisAmbReserva = ReservaTemporal::where('expires_at', '>', now())
-            ->select('usuari_id')
-            ->distinct()
+        $ara = now();
+
+        $reservesActives = ReservaTemporal::query()->where('expires_at', '>', $ara)->count();
+
+        // distinct()->count() amb PostgreSQL pot donar resultats incorrectes; pluck + unique és fiable.
+        $usuarisAmbReserva = ReservaTemporal::query()
+            ->where('expires_at', '>', $ara)
+            ->pluck('usuari_id')
+            ->unique()
             ->count();
 
         $sessions = Sessio::with(['sala', 'peli'])
@@ -36,7 +41,7 @@ class AdminInformesController extends Controller
             $capacitat = (int) ($s->sala?->capacitat ?? 0);
             $venuts = CompraEntrada::where('sessio_id', $sid)->count();
             $reservatsTemp = ReservaTemporal::where('sessio_id', $sid)
-                ->where('expires_at', '>', now())
+                ->where('expires_at', '>', $ara)
                 ->count();
             $disponiblesAforo = AforoService::placesDisponiblesSessio($sid);
             $importSessio = (string) CompraEntrada::where('sessio_id', $sid)->sum('preu_pagat');
