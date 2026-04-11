@@ -24,11 +24,20 @@ const {
 
 const { ensureSocket, joinSessio, reservarTemporal } = useSocket()
 
-const peliId = route.query.peli
-const sessioId = route.query.sessio
+/** Un sol valor de query (evita string[] si hi ha duplicats). */
+function queryUnica(val) {
+  if (val == null) {
+    return undefined
+  }
+  return Array.isArray(val) ? val[0] : val
+}
+
+const peliId = computed(() => queryUnica(route.query.peli))
+const sessioId = computed(() => queryUnica(route.query.sessio))
 
 function mateixaSessio(id) {
-  return id != null && Number(id) === Number(sessioId)
+  const sid = sessioId.value
+  return id != null && sid != null && Number(id) === Number(sid)
 }
 
 function processSeientSeleccionat(data) {
@@ -81,17 +90,20 @@ function onCompraCreada(data) {
   processCompraCreada(data)
 }
 
-const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
-const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
-  baseURL,
-  immediate: !!peliId
-})
+const { data: peli } = await useFetch(
+  computed(() => (peliId.value ? `/peliculas/${peliId.value}` : null)),
+  { baseURL, immediate: true }
+)
+const { data: sessionsList } = await useFetch(
+  computed(() => (peliId.value ? `/peliculas/${peliId.value}/sesiones` : null)),
+  { baseURL, immediate: true }
+)
 const { data: vendaConfig } = await useFetch('/configuracio-venda', { baseURL })
 const { data: seientsApi, pending: seatsLoading, refresh: refreshSeats } = await useFetch(
-  sessioId ? `/sesiones/${sessioId}/asientos` : null,
+  computed(() => (sessioId.value ? `/sesiones/${sessioId.value}/asientos` : null)),
   {
     baseURL,
-    immediate: !!sessioId,
+    immediate: true,
     headers: computed(() => authStore.capcalarsAutenticacio())
   }
 )
@@ -105,19 +117,20 @@ watch(
 )
 
 watch(
-  () => [route.query.peli, route.query.sessio],
+  () => [peliId.value, sessioId.value],
   () => {
-    sessioStore.initForSessio(route.query.peli, route.query.sessio)
+    sessioStore.initForSessio(peliId.value, sessioId.value)
   },
   { immediate: true }
 )
 
 const sessioActual = computed(() => {
   const list = sessionsList.value
-  if (!list || !Array.isArray(list) || !sessioId) {
+  const sid = sessioId.value
+  if (!list || !Array.isArray(list) || sid == null || sid === '') {
     return null
   }
-  return list.find((s) => Number(s.id) === Number(sessioId)) ?? null
+  return list.find((s) => Number(s.id) === Number(sid)) ?? null
 })
 
 function formatSessioEtiqueta(sessio) {
@@ -143,8 +156,9 @@ watch(
 let tickReservaInterval = null
 
 function rejoinSalaAlConnectar() {
-  if (sessioId) {
-    joinSessio(sessioId)
+  const sid = sessioId.value
+  if (sid) {
+    joinSessio(sid)
   }
   const s = ensureSocket()
   if (s) {
@@ -174,13 +188,14 @@ async function cridarReservarTemporal(body) {
 
 async function alliberarReservesSeleccionades() {
   const seats = selectedSeients.value.slice()
-  if (!sessioId || seats.length === 0) {
+  const sid = sessioId.value
+  if (!sid || seats.length === 0) {
     return
   }
   await Promise.all(
     seats.map((seient) =>
       cridarReservarTemporal({
-        sessioId,
+        sessioId: sid,
         seientId: seient.id,
         estat: false
       }).catch(() => {})
@@ -225,9 +240,12 @@ onMounted(async () => {
 
   actualitzaConnexioSocket()
 
-  if (sessioId) {
-    joinSessio(sessioId)
+  const sid = sessioId.value
+  if (sid) {
+    joinSessio(sid)
   }
+
+  sessioStore.setReservaEnCurs(false)
 
   tickReservaInterval = setInterval(() => sessioStore.actualitzaSegonsReserva(), 1000)
 })
@@ -261,9 +279,13 @@ async function toggleSeient(seient) {
   }
 
   sessioStore.setReservaEnCurs(true)
+  const sid = sessioId.value
+  if (sid == null || sid === '') {
+    return
+  }
   try {
     await cridarReservarTemporal({
-      sessioId: sessioId,
+      sessioId: sid,
       seientId: seient.id,
       estat: nouEstat
     })
@@ -334,9 +356,10 @@ const textButaquesSeleccionades = computed(() => {
 
 function anarAPagament() {
   const ids = selectedSeients.value.map((s) => s.id).join(',')
-  if (millorExpiracioIso.value && typeof sessionStorage !== 'undefined') {
+  const sid = sessioId.value
+  if (millorExpiracioIso.value && sid && typeof sessionStorage !== 'undefined') {
     try {
-      sessionStorage.setItem(`ticketfast_expira_${sessioId}`, millorExpiracioIso.value)
+      sessionStorage.setItem(`ticketfast_expira_${sid}`, millorExpiracioIso.value)
     } catch (_) {
       /* ignore */
     }
@@ -344,19 +367,12 @@ function anarAPagament() {
   navigateTo({
     path: '/pago',
     query: {
-      peli: peliId,
-      sessio: String(sessioId),
+      peli: peliId.value,
+      sessio: String(sessioId.value),
       seients: ids
     }
   })
 }
-
-watch(
-  () => route.query.sessio,
-  () => {
-    sessioStore.buidaSeleccio()
-  }
-)
 
 watch(
   () => seients.value,

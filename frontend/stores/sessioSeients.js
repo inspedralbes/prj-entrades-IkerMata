@@ -45,6 +45,7 @@ export const useSessioSeientsStore = defineStore('sessioSeients', () => {
       pendingSeatSocketEvents.value = []
       expiresBySeientId.value = {}
       segonsRestantsReserva.value = 0
+      reservaEnCurs.value = false
     }
   }
 
