@@ -40,7 +40,6 @@ export default defineNuxtConfig({
     }
   },
   routeRules: {
-    '/': { ssr: false },
     '/sala': { ssr: false },
     '/butaques': { ssr: false },
     '/mis-entrades': { ssr: false },

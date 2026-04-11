@@ -1,4 +1,7 @@
 <script setup>
+import { storeToRefs } from 'pinia'
+import { useSessioSeientsStore } from '~/stores/sessioSeients'
+
 definePageMeta({
   layout: 'blank'
 })
@@ -8,6 +11,17 @@ const config = useRuntimeConfig()
 const baseURL = useApiBase()
 const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
+const sessioStore = useSessioSeientsStore()
+const {
+  llistaSeients: seients,
+  selectedSeients,
+  reservaEnCurs,
+  segonsRestantsReserva,
+  millorExpiracioIso,
+  tempsReservaFormat,
+  socketConnected
+} = storeToRefs(sessioStore)
+
 const { ensureSocket, joinSessio, reservarTemporal } = useSocket()
 
 const peliId = route.query.peli
@@ -17,38 +31,54 @@ function mateixaSessio(id) {
   return id != null && Number(id) === Number(sessioId)
 }
 
-const MAX_PENDING_SOCKET_EVENTS = 64
-const pendingSeatSocketEvents = ref([])
-
-function patchSeient(seientId, patch) {
-  const list = seients.value
-  if (!list || !list.length) return
-  const id = Number(seientId)
-  const i = list.findIndex((s) => Number(s.id) === id)
-  if (i === -1) return
-  seients.value = list.map((s, idx) => (idx === i ? { ...s, ...patch } : s))
-}
-
-function enqueueSeatSocketEvent(kind, data) {
-  if (pendingSeatSocketEvents.value.length < MAX_PENDING_SOCKET_EVENTS) {
-    pendingSeatSocketEvents.value.push({ kind, data })
-  }
-}
-
-function flushPendingSeatSocketEvents() {
-  if (!seients.value || seatsLoading.value || pendingSeatSocketEvents.value.length === 0) {
+function processSeientSeleccionat(data) {
+  if (!mateixaSessio(data.sessio_id)) {
     return
   }
-  const batch = pendingSeatSocketEvents.value.splice(0)
-  for (const ev of batch) {
-    if (ev.kind === 'seleccionat') {
-      processSeientSeleccionat(ev.data)
-    } else if (ev.kind === 'alliberat') {
-      processSeientAlliberat(ev.data)
-    } else if (ev.kind === 'compra') {
-      processCompraCreada(ev.data)
-    }
+  const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
+  const actor = data.usuari_id != null ? String(data.usuari_id) : ''
+  if (jo && actor === jo) {
+    return
   }
+  if (!jo && selectedSeients.value.some((s) => Number(s.id) === Number(data.seient_id))) {
+    return
+  }
+  sessioStore.patchSeient(data.seient_id, { seleccionat_per_altre: true })
+}
+
+function processSeientAlliberat(data) {
+  if (!mateixaSessio(data.sessio_id)) {
+    return
+  }
+  sessioStore.patchSeient(data.seient_id, { seleccionat_per_altre: false })
+}
+
+function processCompraCreada(data) {
+  sessioStore.processCompraCreadaLocal(data, mateixaSessio)
+}
+
+function onSeientSeleccionat(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('seleccionat', data)
+    return
+  }
+  processSeientSeleccionat(data)
+}
+
+function onSeientAlliberat(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('alliberat', data)
+    return
+  }
+  processSeientAlliberat(data)
+}
+
+function onCompraCreada(data) {
+  if (seatsLoading.value || !seients.value) {
+    sessioStore.enqueueSeatSocketEvent('compra', data)
+    return
+  }
+  processCompraCreada(data)
 }
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
@@ -57,11 +87,30 @@ const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/ses
   immediate: !!peliId
 })
 const { data: vendaConfig } = await useFetch('/configuracio-venda', { baseURL })
-const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
-  baseURL,
-  immediate: !!sessioId,
-  headers: computed(() => authStore.capcalarsAutenticacio())
-})
+const { data: seientsApi, pending: seatsLoading, refresh: refreshSeats } = await useFetch(
+  sessioId ? `/sesiones/${sessioId}/asientos` : null,
+  {
+    baseURL,
+    immediate: !!sessioId,
+    headers: computed(() => authStore.capcalarsAutenticacio())
+  }
+)
+
+watch(
+  seientsApi,
+  (list) => {
+    sessioStore.aplicaLlistaDesDelServidor(list)
+  },
+  { immediate: true, deep: true }
+)
+
+watch(
+  () => [route.query.peli, route.query.sessio],
+  () => {
+    sessioStore.initForSessio(route.query.peli, route.query.sessio)
+  },
+  { immediate: true }
+)
 
 const sessioActual = computed(() => {
   const list = sessionsList.value
@@ -81,125 +130,28 @@ function formatSessioEtiqueta(sessio) {
   return `${sala} · ${t}`
 }
 
-const selectedSeients = ref([])
-const reservaEnCurs = ref(false)
-
-/** ISO per seient (resposta servidor) per compte enrere coherent */
-const expiresBySeientId = ref({})
-
 const maxSeientsPermesos = computed(() => vendaConfig.value?.max_seients_per_sessio ?? 8)
 
-const millorExpiracioIso = computed(() => {
-  const vals = Object.values(expiresBySeientId.value).filter(Boolean)
-  if (!vals.length) {
-    return null
-  }
-  return vals.reduce((a, b) => (new Date(a) < new Date(b) ? a : b))
-})
-
-const segonsRestantsReserva = ref(0)
-let tickReservaInterval = null
-
-function actualitzaSegonsReserva() {
-  const iso = millorExpiracioIso.value
-  if (!iso) {
-    segonsRestantsReserva.value = 0
-    return
-  }
-  const ms = new Date(iso).getTime() - Date.now()
-  segonsRestantsReserva.value = Math.max(0, Math.floor(ms / 1000))
-}
-
-const tempsReservaFormat = computed(() => {
-  const t = segonsRestantsReserva.value
-  const m = Math.floor(t / 60)
-  const s = t % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-})
-
 watch(
-  millorExpiracioIso,
+  () => sessioStore.millorExpiracioIso,
   () => {
-    actualitzaSegonsReserva()
+    sessioStore.actualitzaSegonsReserva()
   },
   { immediate: true }
 )
 
-watch(
-  seients,
-  (list) => {
-    if (!list || !Array.isArray(list)) {
-      return
-    }
-    const m = {}
-    for (const s of list) {
-      if (s.la_meva_reserva && s.meva_expiracio_iso) {
-        m[s.id] = s.meva_expiracio_iso
-      }
-    }
-    expiresBySeientId.value = m
-  },
-  { immediate: true, deep: true }
-)
-
-function processSeientSeleccionat(data) {
-  if (!mateixaSessio(data.sessio_id)) return
-  const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
-  const actor = data.usuari_id != null ? String(data.usuari_id) : ''
-  if (jo && actor === jo) {
-    return
-  }
-  if (!jo && selectedSeients.value.some((s) => Number(s.id) === Number(data.seient_id))) {
-    return
-  }
-  patchSeient(data.seient_id, { seleccionat_per_altre: true })
-}
-
-function onSeientSeleccionat(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('seleccionat', data)
-    return
-  }
-  processSeientSeleccionat(data)
-}
-
-function processSeientAlliberat(data) {
-  if (!mateixaSessio(data.sessio_id)) return
-  patchSeient(data.seient_id, { seleccionat_per_altre: false })
-}
-
-function onSeientAlliberat(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('alliberat', data)
-    return
-  }
-  processSeientAlliberat(data)
-}
-
-function processCompraCreada(data) {
-  if (!mateixaSessio(data.sessio_id) || !data.seient_ids) return
-  const ids = new Set(data.seient_ids.map((id) => Number(id)))
-  for (const id of ids) {
-    patchSeient(id, { reservat: true, seleccionat_per_altre: false })
-  }
-  selectedSeients.value = selectedSeients.value.filter((s) => !ids.has(s.id))
-}
-
-function onCompraCreada(data) {
-  if (seatsLoading.value || !seients.value) {
-    enqueueSeatSocketEvent('compra', data)
-    return
-  }
-  processCompraCreada(data)
-}
+let tickReservaInterval = null
 
 function rejoinSalaAlConnectar() {
   if (sessioId) {
     joinSessio(sessioId)
   }
+  const s = ensureSocket()
+  if (s) {
+    sessioStore.setSocketConnected(s.connected)
+  }
 }
 
-/** Preferència Socket.IO + ack; fallback HTTP si el socket no està llest. Retorna el cos JSON de Laravel. */
 async function cridarReservarTemporal(body) {
   try {
     return await reservarTemporal({
@@ -234,7 +186,7 @@ async function alliberarReservesSeleccionades() {
       }).catch(() => {})
     )
   )
-  selectedSeients.value = []
+  sessioStore.buidaSeleccio()
   await refreshSeats()
 }
 
@@ -250,22 +202,34 @@ onBeforeRouteLeave(async (to) => {
   await alliberarReservesSeleccionades()
 })
 
+function actualitzaConnexioSocket() {
+  const s = ensureSocket()
+  if (s) {
+    sessioStore.setSocketConnected(s.connected)
+  }
+}
+
 onMounted(async () => {
   await authStore.syncUsuariSiCal(baseURL)
 
   const socket = ensureSocket()
-  if (!socket) return
+  if (!socket) {
+    return
+  }
 
   socket.on('connect', rejoinSalaAlConnectar)
+  socket.on('disconnect', actualitzaConnexioSocket)
   socket.on('seient-seleccionat', onSeientSeleccionat)
   socket.on('seient-alliberat', onSeientAlliberat)
   socket.on('compra-creada', onCompraCreada)
+
+  actualitzaConnexioSocket()
 
   if (sessioId) {
     joinSessio(sessioId)
   }
 
-  tickReservaInterval = setInterval(actualitzaSegonsReserva, 1000)
+  tickReservaInterval = setInterval(() => sessioStore.actualitzaSegonsReserva(), 1000)
 })
 
 onUnmounted(() => {
@@ -274,8 +238,11 @@ onUnmounted(() => {
     tickReservaInterval = null
   }
   const socket = ensureSocket()
-  if (!socket) return
+  if (!socket) {
+    return
+  }
   socket.off('connect', rejoinSalaAlConnectar)
+  socket.off('disconnect', actualitzaConnexioSocket)
   socket.off('seient-seleccionat', onSeientSeleccionat)
   socket.off('seient-alliberat', onSeientAlliberat)
   socket.off('compra-creada', onCompraCreada)
@@ -293,7 +260,7 @@ async function toggleSeient(seient) {
     return
   }
 
-  reservaEnCurs.value = true
+  sessioStore.setReservaEnCurs(true)
   try {
     await cridarReservarTemporal({
       sessioId: sessioId,
@@ -302,11 +269,9 @@ async function toggleSeient(seient) {
     })
 
     if (nouEstat) {
-      if (!selectedSeients.value.some((s) => s.id === seient.id)) {
-        selectedSeients.value.push(seient)
-      }
+      sessioStore.afegirSeleccionat(seient)
     } else {
-      selectedSeients.value.splice(index, 1)
+      sessioStore.treureSeleccionatPerId(seient.id)
     }
     await refreshSeats()
   } catch (e) {
@@ -323,7 +288,7 @@ async function toggleSeient(seient) {
       refreshSeats()
     }
   } finally {
-    reservaEnCurs.value = false
+    sessioStore.setReservaEnCurs(false)
   }
 }
 
@@ -389,29 +354,27 @@ function anarAPagament() {
 watch(
   () => route.query.sessio,
   () => {
-    selectedSeients.value = []
+    sessioStore.buidaSeleccio()
   }
 )
 
 watch(
   () => seients.value,
   (list) => {
-    if (!list || !Array.isArray(list) || selectedSeients.value.length > 0) {
-      return
-    }
-    const mine = list.filter((s) => s.la_meva_reserva)
-    if (mine.length) {
-      selectedSeients.value = mine.slice()
-    }
+    sessioStore.setSelectedFromHydration(list)
   },
-  { immediate: true }
+  { immediate: true, deep: true }
 )
 
 watch([seients, seatsLoading], () => {
-  flushPendingSeatSocketEvents()
+  sessioStore.flushPendingSeatSocketEvents(
+    seatsLoading.value,
+    processSeientSeleccionat,
+    processSeientAlliberat,
+    processCompraCreada
+  )
 })
 
-/** Files A…E: la fila A (davant) queda just sota la pantalla. */
 const filesPerMostrar = computed(() => {
   if (!seients.value?.length) {
     return []
@@ -512,6 +475,13 @@ function onClickSeient(seient) {
               class="pointer-events-none absolute left-1/2 top-0 h-64 w-[120%] -translate-x-1/2 bg-primary/5 blur-[100px]"
             />
           </div>
+
+          <p
+            v-if="socketConnected === false"
+            class="mb-4 font-label text-[10px] uppercase tracking-widest text-amber-500/90"
+          >
+            Connexió en temps real: reconnectant…
+          </p>
 
           <div v-if="seatsLoading" class="py-16 font-headline text-sm uppercase tracking-[0.2em] text-stone-500">
             Carregant seients…
