@@ -17,7 +17,11 @@ class AdminInformesController extends Controller
      */
     public function panellTempsReal(Request $request): JsonResponse
     {
-        if ($request->user()->rol !== 'admin') {
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json(['error' => 'Cal iniciar sessió'], 401);
+        }
+        if ($user->rol !== 'admin') {
             return response()->json(['error' => 'Accés denegat'], 403);
         }
 
@@ -75,7 +79,11 @@ class AdminInformesController extends Controller
      */
     public function informesResum(Request $request): JsonResponse
     {
-        if ($request->user()->rol !== 'admin') {
+        $user = $request->user();
+        if ($user === null) {
+            return response()->json(['error' => 'Cal iniciar sessió'], 401);
+        }
+        if ($user->rol !== 'admin') {
             return response()->json(['error' => 'Accés denegat'], 403);
         }
 
