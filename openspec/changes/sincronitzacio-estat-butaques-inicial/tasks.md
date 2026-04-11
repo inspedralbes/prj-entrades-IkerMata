@@ -16,4 +16,4 @@
 
 ## 4. Verificació
 
-- [x] 4.1 Executar escenaris de `doc/sincronizacion-inicial-fix.md` (dos clients, refresh) i registrar resultat. *(Pendent validació humana en entorn local.)*
+- [x] 4.1 Validar sincronització inicial de butaques (dos clients, refresh) i registrar resultat. *(Pendent validació humana en entorn local si cal.)*

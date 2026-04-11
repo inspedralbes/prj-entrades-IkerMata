@@ -1,6 +1,6 @@
 # Prova de concurrencia (dos usuaris, un seient)
 
-L’esquema de base de dades es manté amb **`base_de_dades/sql`** (sense migracions Laravel), tal com indica `agents/Agentlaravel.md`. Per això la prova d’integració **no** depèn de `php artisan migrate` per crear taules; cal tenir **PostgreSQL** amb `init.sql` / `insert.sql` aplicats (p. ex. Docker Compose).
+L’esquema de base de dades es manté amb **`base_de_dades/sql`** (sense migracions Laravel per al disseny de taules; vegeu `agents/Agentlaravel.md`). Per això la prova d’integració **no** depèn de `php artisan migrate` per crear taules; cal tenir **PostgreSQL** amb `init.sql` / `insert.sql` aplicats (p. ex. Docker Compose).
 
 ## Objectiu
 

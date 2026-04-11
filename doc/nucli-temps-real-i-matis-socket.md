@@ -1,6 +1,6 @@
 # Nucli de temps real: servidor com a font de veritat i paper de Socket.IO
 
-Aquest document cobreix el **punt 1** de `pendents-respecte-enunciat.md` (*Nucli: temps real, concurrència, servidor com a veritat*): com està implementat al projecte i com **justificar** el disseny davant de l’enunciat (especialment el matís «reserva via Socket.IO»).
+Aquest document cobreix el **nucli de la pràctica** (*temps real, concurrència, servidor com a font de veritat*): com està implementat al projecte i com **justificar** el disseny davant de l’enunciat (especialment el matís «reserva via Socket.IO»).
 
 ---
 
