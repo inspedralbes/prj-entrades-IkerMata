@@ -3,13 +3,12 @@ import { storeToRefs } from 'pinia'
 import { useSessioSeientsStore } from '~/stores/sessioSeients'
 
 definePageMeta({
-  layout: 'blank'
+  layout: 'blank',
+  middleware: 'auth'
 })
 
 const route = useRoute()
-const config = useRuntimeConfig()
 const baseURL = useApiBase()
-const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
 const sessioStore = useSessioSeientsStore()
 const {
@@ -22,7 +21,7 @@ const {
   socketConnected
 } = storeToRefs(sessioStore)
 
-const { ensureSocket, joinSessio, reservarTemporal } = useSocket()
+const { ensureSocket, joinSessio } = useSocket()
 
 /** Un sol valor de query (evita string[] si hi ha duplicats). */
 function queryUnica(val) {
@@ -167,23 +166,12 @@ function rejoinSalaAlConnectar() {
 }
 
 async function cridarReservarTemporal(body) {
-  try {
-    return await reservarTemporal({
-      sessioId: body.sessioId,
-      seientId: body.seientId,
-      estat: body.estat,
-      token: authStore.token
-    })
-  } catch (e) {
-    if (e.cause === 'no_socket' || e.cause === 'timeout_reserva' || e.cause === 'empty_ack') {
-      return await $fetch(`${gatewayURL}/api/reservar`, {
-        method: 'POST',
-        headers: authStore.capcalarsAutenticacio(),
-        body
-      })
-    }
-    throw e
-  }
+  const base = baseURL.value?.replace(/\/$/, '') ?? ''
+  return await $fetch(`${base}/reservar`, {
+    method: 'POST',
+    headers: authStore.capcalarsAutenticacio(),
+    body
+  })
 }
 
 async function alliberarReservesSeleccionades() {
@@ -266,6 +254,36 @@ onUnmounted(() => {
   socket.off('compra-creada', onCompraCreada)
 })
 
+function missatgeErrorReserva(e) {
+  const d = e?.data ?? e?.response?._data
+  if (typeof d === 'string') {
+    return d
+  }
+  if (d && typeof d === 'object') {
+    if (typeof d.error === 'string') {
+      return d.error
+    }
+    if (typeof d.message === 'string') {
+      return d.message
+    }
+    if (d.errors && typeof d.errors === 'object') {
+      const vals = Object.values(d.errors)
+      const first = vals[0]
+      if (Array.isArray(first) && first[0]) {
+        return String(first[0])
+      }
+      if (typeof first === 'string') {
+        return first
+      }
+    }
+  }
+  return null
+}
+
+function statusErrorReserva(e) {
+  return e?.statusCode ?? e?.status ?? e?.response?.status
+}
+
 async function toggleSeient(seient) {
   if (reservaEnCurs.value) {
     return
@@ -278,16 +296,18 @@ async function toggleSeient(seient) {
     return
   }
 
-  sessioStore.setReservaEnCurs(true)
   const sid = sessioId.value
   if (sid == null || sid === '') {
+    alert('Falta identificar la sessió (torna a la cartellera i tria sessió).')
     return
   }
+
+  sessioStore.setReservaEnCurs(true)
   try {
     await cridarReservarTemporal({
       sessioId: sid,
       seientId: seient.id,
-      estat: nouEstat
+      estat: Boolean(nouEstat)
     })
 
     if (nouEstat) {
@@ -297,16 +317,28 @@ async function toggleSeient(seient) {
     }
     await refreshSeats()
   } catch (e) {
-    const status = e.statusCode ?? e.status ?? e.response?.status
-    const msg = e.data?.error ?? e.response?._data?.error
+    const status = statusErrorReserva(e)
+    const msg = missatgeErrorReserva(e)
     if (status === 401) {
       await authStore.logout()
       navigateTo('/login')
     } else if (status === 422) {
       alert(msg || 'Límit de seients assolit.')
       refreshSeats()
+    } else if (status === 409) {
+      alert(msg || 'El seient ja està reservat o ocupat.')
+      refreshSeats()
     } else {
-      alert(msg || 'No s\'ha pogut reservar el seient')
+      const senseConnexio =
+        msg == null &&
+        (status == null || status === 0) &&
+        (typeof e?.message === 'string' && /failed|network|fetch/i.test(e.message))
+      alert(
+        msg ||
+          (senseConnexio
+            ? 'No s\'ha pogut contactar el gateway (socket/API). Comprova la connexió; en producció cal NUXT_PUBLIC_GATEWAY_URL correcte o el port del gateway obert.'
+            : 'No s\'ha pogut reservar el seient')
+      )
       refreshSeats()
     }
   } finally {

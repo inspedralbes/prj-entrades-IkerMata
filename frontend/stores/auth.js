@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { toValue } from 'vue'
+import { resolvePublicGatewayUrl } from '~/composables/publicGatewayUrl'
 
 export const useAuthStore = defineStore('auth', () => {
   const tokenCookie = useCookie('sanctum_token', {
@@ -29,7 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function login(email, password) {
     const config = useRuntimeConfig()
-    const url = config.public.gatewayUrl + '/api/login'
+    const url = resolvePublicGatewayUrl(config.public.gatewayUrl) + '/api/login'
 
     const res = await $fetch(url, {
       method: 'POST',
@@ -65,7 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout() {
     const config = useRuntimeConfig()
-    const url = config.public.gatewayUrl + '/api/logout'
+    const url = resolvePublicGatewayUrl(config.public.gatewayUrl) + '/api/logout'
 
     try {
       await $fetch(url, {

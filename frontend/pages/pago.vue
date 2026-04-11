@@ -5,9 +5,8 @@ definePageMeta({
 })
 
 const route = useRoute()
-const config = useRuntimeConfig()
 const baseURL = useApiBase()
-const gatewayURL = config.public.gatewayUrl
+const gatewayURL = usePublicGatewayUrl()
 const authStore = useAuthStore()
 
 function primerQuery(val) {
@@ -213,7 +212,7 @@ async function enviarCompra() {
       sessioId: sessioNum,
       seientIds: seientIds.value
     }
-    const urlComprar = gatewayURL + '/api/comprar'
+    const urlComprar = gatewayURL.value + '/api/comprar'
     await $fetch(urlComprar, {
       method: 'POST',
       body: cos,
