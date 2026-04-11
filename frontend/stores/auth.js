@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { toValue } from 'vue'
 
 export const useAuthStore = defineStore('auth', () => {
   const tokenCookie = useCookie('sanctum_token', {
@@ -91,8 +92,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function syncUsuariSiCal(apiBase) {
     if (!token.value) return
     if (user.value && user.value.id) return
+    const base = toValue(apiBase)
+    if (!base || typeof base !== 'string') return
     try {
-      const u = await $fetch(apiBase + '/usuari', {
+      const u = await $fetch(base + '/usuari', {
         headers: capcalarsAutenticacio()
       })
       if (u && u.id) {

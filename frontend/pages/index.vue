@@ -1,8 +1,8 @@
 <script setup>
 const baseURL = useApiBase()
-const { joinPelicula, onAforoActualitzat, ensureSocket } = useSocket()
+const { joinPelicula, onAforoActualitzat, onCatalogActualitzat, ensureSocket } = useSocket()
 
-const { data: moviesData, pending, error } = await useFetch('/peliculas', {
+const { data: moviesData, pending, error, refresh: refreshPeliculas } = await useFetch('/peliculas', {
   baseURL,
   timeout: 5000,
   key: 'cartellera-peliculas'
@@ -23,6 +23,7 @@ watch(
 )
 
 let offAforoActualitzat = () => {}
+let offCatalogActualitzat = () => {}
 let offSocketConnect = () => {}
 
 function joinAllPelicules() {
@@ -46,6 +47,12 @@ onMounted(() => {
     )
   })
 
+  offCatalogActualitzat = onCatalogActualitzat(async () => {
+    await refreshPeliculas()
+    await nextTick()
+    joinAllPelicules()
+  })
+
   const socket = ensureSocket()
   if (socket) {
     socket.on('connect', joinAllPelicules)
@@ -56,6 +63,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   offAforoActualitzat()
+  offCatalogActualitzat()
   offSocketConnect()
 })
 </script>

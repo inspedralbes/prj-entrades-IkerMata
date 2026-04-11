@@ -1,12 +1,21 @@
 <?php
 
 use App\Services\AforoService;
+use App\Services\TempsRealService;
+use App\Support\SeientTemporalEstat;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\PersonalAccessToken;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\EntradaController;
+use App\Models\CategoriaSeient;
+use App\Models\CompraEntrada;
 use App\Models\Peli;
+use App\Models\PreuSessio;
+use App\Models\Sala;
 use App\Models\Sessio;
 use App\Models\Seient;
 
@@ -71,6 +80,7 @@ Route::get('/peliculas/{id}/sesiones', function ($id) {
         return [
             'id' => $s->id,
             'uuid' => $s->uuid,
+            'sala_id' => $s->sala_id,
             'sala_nom' => $s->sala->nom,
             'data_hora' => $s->data_hora,
             'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $s->id),
@@ -78,10 +88,20 @@ Route::get('/peliculas/{id}/sesiones', function ($id) {
     });
 });
 
-Route::get('/sesiones/{id}/asientos', function ($id) {
+Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
     $sessio = Sessio::find($id);
     if (! $sessio) {
         return [];
+    }
+
+    $authUserId = null;
+    $bearer = $request->bearerToken();
+    if ($bearer) {
+        $accessToken = PersonalAccessToken::findToken($bearer);
+        $tokenable = $accessToken?->tokenable;
+        if ($tokenable instanceof User) {
+            $authUserId = (string) $tokenable->getAuthIdentifier();
+        }
     }
 
     $seients = Seient::where('sala_id', $sessio->sala_id)
@@ -98,9 +118,10 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
         ->where('expires_at', '>', now())
         ->get();
 
-    return $seients->map(function ($s) use ($venuts, $reserves) {
+    return $seients->map(function ($s) use ($venuts, $reserves, $authUserId) {
         $isVenut = in_array($s->id, $venuts);
         $reserva = $reserves->firstWhere('seient_id', $s->id);
+        $temporal = SeientTemporalEstat::flags($isVenut, $reserva, $authUserId);
 
         return [
             'id' => $s->id,
@@ -109,8 +130,8 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
             'categoria' => $s->categoria->nom,
             'color' => $s->categoria->color_hex,
             'reservat' => $isVenut,
-            'seleccionat_per_altre' => ! $isVenut && $reserva !== null,
-            'usuari_reserva' => $reserva ? $reserva->usuari_id : null
+            'seleccionat_per_altre' => $temporal['seleccionat_per_altre'],
+            'la_meva_reserva' => $temporal['la_meva_reserva'],
         ];
     });
 });
@@ -136,6 +157,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'durada_minuts' => 'required|integer|min:1',
             'estat' => 'nullable|in:actiu,inactiu'
         ]));
+        TempsRealService::notificarCatalogPelicules();
+
         return response()->json($peli, 201);
     });
 
@@ -152,6 +175,8 @@ Route::middleware('auth:sanctum')->group(function () {
             'durada_minuts' => 'sometimes|integer|min:1',
             'estat' => 'nullable|in:actiu,inactiu'
         ]));
+        TempsRealService::notificarCatalogPelicules();
+
         return response()->json($peli);
     });
 
@@ -162,6 +187,107 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $peli = Peli::findOrFail($id);
         $peli->delete();
+        TempsRealService::notificarCatalogPelicules();
+
+        return response()->json(['ok' => true]);
+    });
+
+    // Admin: sales (selector sala)
+    Route::get('/sales', function (Request $request) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        return Sala::orderBy('id')->get(['id', 'nom', 'capacitat']);
+    });
+
+    // Admin: CRUD sessions (passis)
+    Route::post('/peliculas/{peliId}/sesiones', function (Request $request, $peliId) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        Peli::findOrFail($peliId);
+
+        $dades = $request->validate([
+            'sala_id' => 'required|integer|exists:sales,id',
+            'data_hora' => 'required|date',
+        ]);
+
+        $sessio = Sessio::create([
+            'esdeveniment_id' => (int) $peliId,
+            'sala_id' => $dades['sala_id'],
+            'data_hora' => $dades['data_hora'],
+        ]);
+
+        foreach (CategoriaSeient::orderBy('id')->get() as $cat) {
+            $esVip = strcasecmp((string) $cat->nom, 'VIP') === 0;
+            PreuSessio::create([
+                'sessio_id' => $sessio->id,
+                'categoria_id' => $cat->id,
+                'preu' => $esVip ? 9.70 : 6.70,
+            ]);
+        }
+
+        $sessio->load('sala');
+
+        TempsRealService::notificarCatalogSessions((int) $peliId);
+
+        return response()->json([
+            'id' => $sessio->id,
+            'uuid' => $sessio->uuid,
+            'sala_id' => $sessio->sala_id,
+            'sala_nom' => $sessio->sala->nom,
+            'data_hora' => $sessio->data_hora,
+            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $sessio->id),
+        ], 201);
+    });
+
+    Route::put('/sesiones/{id}', function (Request $request, $id) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        $sessio = Sessio::findOrFail($id);
+
+        $dades = $request->validate([
+            'sala_id' => 'sometimes|integer|exists:sales,id',
+            'data_hora' => 'sometimes|date',
+        ]);
+
+        $sessio->update($dades);
+        $sessio->load('sala');
+
+        TempsRealService::notificarCatalogSessions((int) $sessio->esdeveniment_id);
+
+        return response()->json([
+            'id' => $sessio->id,
+            'uuid' => $sessio->uuid,
+            'sala_id' => $sessio->sala_id,
+            'sala_nom' => $sessio->sala->nom,
+            'data_hora' => $sessio->data_hora,
+            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $sessio->id),
+        ]);
+    });
+
+    Route::delete('/sesiones/{id}', function (Request $request, $id) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        $sessio = Sessio::findOrFail($id);
+
+        if (CompraEntrada::where('sessio_id', (int) $id)->exists()) {
+            return response()->json([
+                'error' => 'No es pot eliminar: hi ha entrades venudes per aquesta sessió.',
+            ], 422);
+        }
+
+        $peliculaId = (int) $sessio->esdeveniment_id;
+        $sessio->delete();
+
+        TempsRealService::notificarCatalogSessions($peliculaId);
+
         return response()->json(['ok' => true]);
     });
 });

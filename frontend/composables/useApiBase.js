@@ -1,3 +1,5 @@
+import { computed } from 'vue'
+
 /**
  * Evita URLs tipus http://http://... si .env duplica el prefix (error comú en desplegament).
  */
@@ -14,10 +16,18 @@ export function normalizePublicHttpUrl(url) {
 
 /**
  * Base URL de l'API Laravel (sempre la pública del navegador).
- * Les pàgines que fan fetch han usar `routeRules` amb `ssr: false` si no hi ha proxy intern,
- * per evitar desquadraments d'hidratació entre servidor i client.
+ * Retorna un Computed perquè `config.public.apiBase` (NUXT_PUBLIC_API_BASE) no quedi buit/undefined
+ * en alguns entorns (Docker, HMR) i per poder passar-lo a useFetch com a opció reactiva.
+ * Les pàgines que fan fetch han usar `routeRules` amb `ssr: false` si no hi ha proxy intern.
  */
+const DEFAULT_API_BASE = 'http://localhost:8001/api'
+
 export function useApiBase() {
   const config = useRuntimeConfig()
-  return normalizePublicHttpUrl(config.public.apiBase)
+  return computed(() => {
+    const u = config.public.apiBase
+    const s = typeof u === 'string' ? u.trim() : ''
+    const base = s.length > 0 ? s : DEFAULT_API_BASE
+    return normalizePublicHttpUrl(base.replace(/\/$/, ''))
+  })
 }
