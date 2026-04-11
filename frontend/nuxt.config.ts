@@ -12,6 +12,8 @@ export default defineNuxtConfig({
       title: 'TICKET-FAST | Cartelera',
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
       link: [
+        { rel: 'icon', type: 'image/png', href: '/favicon.png' },
+        { rel: 'apple-touch-icon', href: '/favicon.png' },
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         {
           rel: 'preconnect',
