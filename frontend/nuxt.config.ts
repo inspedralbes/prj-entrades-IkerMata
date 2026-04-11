@@ -19,7 +19,8 @@ export default defineNuxtConfig({
     '/mis-entrades': { ssr: false },
     '/pago': { ssr: false },
     '/login': { ssr: false },
-    '/registre': { ssr: false }
+    '/registre': { ssr: false },
+    '/admin': { ssr: false }
   },
   vite: {
     optimizeDeps: {

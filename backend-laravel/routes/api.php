@@ -6,9 +6,14 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\EntradaController;
+use App\Models\CategoriaSeient;
+use App\Models\CompraEntrada;
 use App\Models\Peli;
+use App\Models\PreuSessio;
+use App\Models\Sala;
 use App\Models\Sessio;
 use App\Models\Seient;
+use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'registrar']);
 Route::post('/login', [AuthController::class, 'login']);
@@ -71,6 +76,7 @@ Route::get('/peliculas/{id}/sesiones', function ($id) {
         return [
             'id' => $s->id,
             'uuid' => $s->uuid,
+            'sala_id' => $s->sala_id,
             'sala_nom' => $s->sala->nom,
             'data_hora' => $s->data_hora,
             'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $s->id),
@@ -162,6 +168,98 @@ Route::middleware('auth:sanctum')->group(function () {
         }
         $peli = Peli::findOrFail($id);
         $peli->delete();
+        return response()->json(['ok' => true]);
+    });
+
+    // Admin: sales (selector sala)
+    Route::get('/sales', function (Request $request) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        return Sala::orderBy('id')->get(['id', 'nom', 'capacitat']);
+    });
+
+    // Admin: CRUD sessions (passis)
+    Route::post('/peliculas/{peliId}/sesiones', function (Request $request, $peliId) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        Peli::findOrFail($peliId);
+
+        $dades = $request->validate([
+            'sala_id' => 'required|integer|exists:sales,id',
+            'data_hora' => 'required|date',
+        ]);
+
+        $sessio = Sessio::create([
+            'esdeveniment_id' => (int) $peliId,
+            'sala_id' => $dades['sala_id'],
+            'data_hora' => $dades['data_hora'],
+        ]);
+
+        foreach (CategoriaSeient::orderBy('id')->get() as $cat) {
+            $esVip = strcasecmp((string) $cat->nom, 'VIP') === 0;
+            PreuSessio::create([
+                'sessio_id' => $sessio->id,
+                'categoria_id' => $cat->id,
+                'preu' => $esVip ? 9.70 : 6.70,
+            ]);
+        }
+
+        $sessio->load('sala');
+
+        return response()->json([
+            'id' => $sessio->id,
+            'uuid' => $sessio->uuid,
+            'sala_id' => $sessio->sala_id,
+            'sala_nom' => $sessio->sala->nom,
+            'data_hora' => $sessio->data_hora,
+            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $sessio->id),
+        ], 201);
+    });
+
+    Route::put('/sesiones/{id}', function (Request $request, $id) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        $sessio = Sessio::findOrFail($id);
+
+        $dades = $request->validate([
+            'sala_id' => 'sometimes|integer|exists:sales,id',
+            'data_hora' => 'sometimes|date',
+        ]);
+
+        $sessio->update($dades);
+        $sessio->load('sala');
+
+        return response()->json([
+            'id' => $sessio->id,
+            'uuid' => $sessio->uuid,
+            'sala_id' => $sessio->sala_id,
+            'sala_nom' => $sessio->sala->nom,
+            'data_hora' => $sessio->data_hora,
+            'aforo_disponible' => AforoService::placesDisponiblesSessio((int) $sessio->id),
+        ]);
+    });
+
+    Route::delete('/sesiones/{id}', function (Request $request, $id) {
+        if ($request->user()->rol !== 'admin') {
+            return response()->json(['error' => 'Accés denegat'], 403);
+        }
+
+        $sessio = Sessio::findOrFail($id);
+
+        if (CompraEntrada::where('sessio_id', (int) $id)->exists()) {
+            return response()->json([
+                'error' => 'No es pot eliminar: hi ha entrades venudes per aquesta sessió.',
+            ], 422);
+        }
+
+        $sessio->delete();
+
         return response()->json(['ok' => true]);
     });
 });

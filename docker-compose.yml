@@ -13,6 +13,9 @@ services:
     environment:
       - NODE_ENV=development
       - GATEWAY_URL=http://localhost:3003
+      # URL pública de l'API Laravel des del navegador (port mapejat al host)
+      - NUXT_PUBLIC_API_BASE=http://localhost:8001/api
+      - NUXT_PUBLIC_GATEWAY_URL=http://localhost:3003
     networks:
       - ticket-net
     depends_on:
