@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Sessio;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
 
 //================================ CONSTANTS ================================
@@ -29,7 +30,14 @@ class TempsRealService
             'data' => $data,
             'timestamp' => time()
         ]);
-        Redis::publish($channel, $missatge);
+        try {
+            Redis::publish($channel, $missatge);
+        } catch (\Throwable $e) {
+            Log::warning('TempsRealService: Redis publish ha fallat (la reserva/compra pot haver-se desat igualment)', [
+                'channel' => $channel,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public static function notificarCompra(int $sessioId, array $seientIds): void

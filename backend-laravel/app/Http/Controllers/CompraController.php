@@ -128,6 +128,12 @@ class CompraController extends Controller
 
             $expiresAt = now()->addMinutes($minuts);
 
+            // La UNIQUE és (seient_id, sessio_id). Les files caducades encara bloquejen l'INSERT si no s'esborren.
+            \App\Models\ReservaTemporal::where('sessio_id', $sessioId)
+                ->where('seient_id', $seientId)
+                ->where('expires_at', '<=', now())
+                ->delete();
+
             $fila = \App\Models\ReservaTemporal::updateOrCreate(
                 ['sessio_id' => $sessioId, 'seient_id' => $seientId, 'usuari_id' => $usuariIdStr],
                 ['expires_at' => $expiresAt]

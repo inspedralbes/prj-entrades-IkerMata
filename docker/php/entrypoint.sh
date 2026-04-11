@@ -16,4 +16,12 @@ fi
 
 PGPASSWORD=secret psql --username=laravel --dbname=laravel -h db -f /docker-entrypoint-initdb.d/insert.sql || echo "AVIS: insert.sql no aplicat (normal si ja hi ha dades)."
 
+# Laravel: escriptura a storage/ i bootstrap/cache (evita "Permission denied" a laravel.log)
+if [ -d /var/www ]; then
+  cd /var/www || exit 1
+  mkdir -p storage/logs storage/framework/sessions storage/framework/views storage/framework/cache/data bootstrap/cache
+  chown -R www-data:www-data storage bootstrap/cache 2>/dev/null || true
+  chmod -R ug+rwx storage bootstrap/cache 2>/dev/null || true
+fi
+
 exec php-fpm
