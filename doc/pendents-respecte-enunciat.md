@@ -16,7 +16,7 @@ Aquest document resumeix **allò que encara falta o queda parcial** respecte al 
 | Reserva temporal amb caducitat | Cobert | `expires_at`, comanda d’alliberament, etc. |
 | Compra amb usuari autenticat i propagació en temps real | Cobert | Flux `comprar` + notificacions |
 
-**Matís:** l’enunciat diu que la reserva s’envia “via Socket.IO”; en aquest projecte la **petició de reserva és HTTP (`POST /api/reservar`)** i Socket.IO **difon** l’estat. És coherent (el servidor decideix), però **cal poder explicar-ho** a la memòria/exposició si el professor ho demana literalment.
+**Matís (documentat):** l’enunciat pot llegir-se com si la reserva s’enviés només per Socket.IO; en aquest projecte la **petició de reserva és HTTP (`POST /api/reservar`)** i Socket.IO **difon** l’estat ja validat. Veure la justificació tècnica, diagrama de seqüència i text per a la memòria a **`doc/nucli-temps-real-i-matis-socket.md`**.
 
 ---
 

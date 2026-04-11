@@ -62,6 +62,46 @@ export function useSocket() {
     return () => {}
   }
 
+  /**
+   * Reserva temporal via Socket.IO amb ack (Laravel com a autoritat al gateway).
+   * Rebutja amb `cause` 'no_socket' | 'timeout_reserva' | 'empty_ack' per permetre fallback HTTP.
+   */
+  function reservarTemporal({ sessioId, seientId, estat, token }) {
+    const s = ensureSocket()
+    if (!s?.connected) {
+      return Promise.reject(Object.assign(new Error('Socket no connectat'), { cause: 'no_socket' }))
+    }
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => {
+        reject(Object.assign(new Error('Timeout reserva'), { cause: 'timeout_reserva' }))
+      }, 20000)
+      s.emit(
+        'reserva-temporal',
+        {
+          sessioId,
+          seientId,
+          estat,
+          token: token ?? null
+        },
+        (res) => {
+          clearTimeout(t)
+          if (res == null) {
+            reject(Object.assign(new Error('Resposta buida'), { cause: 'empty_ack' }))
+            return
+          }
+          if (res.ok) {
+            resolve(res.data)
+            return
+          }
+          const err = new Error('Reserva rebutjada')
+          err.statusCode = res.status
+          err.data = res.data
+          reject(err)
+        }
+      )
+    })
+  }
+
   return {
     socket,
     ensureSocket,
@@ -69,6 +109,7 @@ export function useSocket() {
     joinPelicula,
     onAforoActualitzat,
     onCompraCreada,
-    onCatalogActualitzat
+    onCatalogActualitzat,
+    reservarTemporal
   }
 }

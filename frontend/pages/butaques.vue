@@ -8,7 +8,7 @@ const config = useRuntimeConfig()
 const baseURL = useApiBase()
 const gatewayURL = config.public.gatewayUrl
 const authStore = useAuthStore()
-const { ensureSocket, joinSessio } = useSocket()
+const { ensureSocket, joinSessio, reservarTemporal } = useSocket()
 
 const peliId = route.query.peli
 const sessioId = route.query.sessio
@@ -140,6 +140,28 @@ function rejoinSalaAlConnectar() {
   }
 }
 
+/** Preferència Socket.IO + ack; fallback HTTP si el socket no està llest. */
+async function cridarReservarTemporal(body) {
+  try {
+    await reservarTemporal({
+      sessioId: body.sessioId,
+      seientId: body.seientId,
+      estat: body.estat,
+      token: authStore.token
+    })
+  } catch (e) {
+    if (e.cause === 'no_socket' || e.cause === 'timeout_reserva' || e.cause === 'empty_ack') {
+      await $fetch(`${gatewayURL}/api/reservar`, {
+        method: 'POST',
+        headers: authStore.capcalarsAutenticacio(),
+        body
+      })
+      return
+    }
+    throw e
+  }
+}
+
 async function alliberarReservesSeleccionades() {
   const seats = selectedSeients.value.slice()
   if (!sessioId || seats.length === 0) {
@@ -147,14 +169,10 @@ async function alliberarReservesSeleccionades() {
   }
   await Promise.all(
     seats.map((seient) =>
-      $fetch(`${gatewayURL}/api/reservar`, {
-        method: 'POST',
-        headers: authStore.capcalarsAutenticacio(),
-        body: {
-          sessioId,
-          seientId: seient.id,
-          estat: false
-        }
+      cridarReservarTemporal({
+        sessioId,
+        seientId: seient.id,
+        estat: false
       }).catch(() => {})
     )
   )
@@ -207,14 +225,10 @@ async function toggleSeient(seient) {
 
   reservaEnCurs.value = true
   try {
-    await $fetch(`${gatewayURL}/api/reservar`, {
-      method: 'POST',
-      headers: authStore.capcalarsAutenticacio(),
-      body: {
-        sessioId: sessioId,
-        seientId: seient.id,
-        estat: nouEstat
-      }
+    await cridarReservarTemporal({
+      sessioId: sessioId,
+      seientId: seient.id,
+      estat: nouEstat
     })
 
     if (nouEstat) {
@@ -225,11 +239,13 @@ async function toggleSeient(seient) {
       selectedSeients.value.splice(index, 1)
     }
   } catch (e) {
-    if (e.response && e.response.status === 401) {
+    const status = e.statusCode ?? e.status ?? e.response?.status
+    const msg = e.data?.error ?? e.response?._data?.error
+    if (status === 401) {
       await authStore.logout()
       navigateTo('/login')
     } else {
-      alert(e.data?.error || 'No s\'ha pogut reservar el seient')
+      alert(msg || 'No s\'ha pogut reservar el seient')
       refreshSeats()
     }
   } finally {
