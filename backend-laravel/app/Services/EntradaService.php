@@ -60,7 +60,9 @@ class EntradaService
 
             $fila = [
                 'id' => $compra->id,
+                'pelicula_id' => $peli !== null ? $peli->id : null,
                 'peli_titol' => $titolPeli,
+                'imatge_url' => $peli !== null ? $peli->imatge_url : null,
                 'data_hora' => $sessio->data_hora,
                 'sala_nom' => $nomSala,
                 'seient' => $etiquetaSeient,
