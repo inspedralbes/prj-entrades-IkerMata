@@ -277,6 +277,12 @@ function sessioSlotClass(disponible) {
               >
                 {{ peli.titol }}
               </h1>
+              <p
+                v-if="peli.durada_minuts"
+                class="mt-4 font-body text-sm text-stone-400"
+              >
+                Durada aproximada: {{ peli.durada_minuts }} min
+              </p>
 
               <div v-if="peli.descripcio" class="mt-8 max-w-xl border-t border-white/10 pt-8">
                 <h3 class="font-headline text-xs font-bold uppercase tracking-[0.2em] text-stone-400">
@@ -366,6 +372,14 @@ function sessioSlotClass(disponible) {
                       >
                         {{ sessio.parts.diaEtiqueta }}
                       </span>
+                      <div
+                        v-if="sessio.preus?.length"
+                        class="mt-2 flex flex-wrap justify-center gap-x-2 gap-y-0.5 font-body text-[8px] uppercase tracking-wider text-stone-500"
+                      >
+                        <span v-for="tp in sessio.preus" :key="sessio.id + '-' + tp.categoria">
+                          {{ tp.categoria }} {{ tp.preu }}€
+                        </span>
+                      </div>
                       <span
                         v-if="sessio.aforo_disponible > 0"
                         class="font-label mt-1 text-[9px] font-semibold uppercase tracking-wider text-primary"

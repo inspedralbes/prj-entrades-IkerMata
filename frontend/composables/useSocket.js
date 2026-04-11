@@ -33,6 +33,14 @@ export function useSocket() {
     }
   }
 
+  /** Sala `admin` al gateway: mètriques del panell s’actualitzen per esdeveniments Redis/HTTP. */
+  function joinPanellAdmin() {
+    const s = ensureSocket()
+    if (s) {
+      s.emit('unirse-panell-admin')
+    }
+  }
+
   /** Retorna una funció per fer `off` del mateix callback (evita fugues en canviar de pàgina). */
   function onAforoActualitzat(callback) {
     const s = ensureSocket()
@@ -58,6 +66,16 @@ export function useSocket() {
     if (s) {
       s.on('catalog-actualitzat', callback)
       return () => s.off('catalog-actualitzat', callback)
+    }
+    return () => {}
+  }
+
+  /** Panell admin: el gateway emet després de reserves, compres o aforo (Redis o HTTP). */
+  function onAdminPanellRefresh(callback) {
+    const s = ensureSocket()
+    if (s) {
+      s.on('admin-panell-refresh', callback)
+      return () => s.off('admin-panell-refresh', callback)
     }
     return () => {}
   }
@@ -107,9 +125,11 @@ export function useSocket() {
     ensureSocket,
     joinSessio,
     joinPelicula,
+    joinPanellAdmin,
     onAforoActualitzat,
     onCompraCreada,
     onCatalogActualitzat,
+    onAdminPanellRefresh,
     reservarTemporal
   }
 }

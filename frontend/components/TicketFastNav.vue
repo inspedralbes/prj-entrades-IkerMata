@@ -1,6 +1,24 @@
 <script setup>
+const props = defineProps({
+  /** `default`: Cartellera + entrades. `admin`: Dashboard + temps real (mateix estil noir). */
+  variant: {
+    type: String,
+    default: 'default',
+    validator: (v) => v === 'default' || v === 'admin'
+  }
+})
+
 const route = useRoute()
 const authStore = useAuthStore()
+
+const esAdmin = computed(() => props.variant === 'admin')
+
+/** Actiu per a tot l’admin excepte l’ancora «temps real». */
+const actiuPanellAdmin = computed(
+  () => route.path === '/admin' && route.hash !== '#temps-real'
+)
+
+const actiuTempsRealAdmin = computed(() => route.path === '/admin' && route.hash === '#temps-real')
 
 async function sortir() {
   await authStore.logout()
@@ -19,28 +37,54 @@ async function sortir() {
       TICKET-FAST
     </NuxtLink>
     <div class="flex items-center justify-center gap-6 md:gap-10">
-      <NuxtLink
-        to="/"
-        class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-        :class="
-          route.path === '/'
-            ? 'font-bold text-white'
-            : 'font-light text-stone-400 hover:text-red-400'
-        "
-      >
-        Cartelera
-      </NuxtLink>
-      <NuxtLink
-        to="/mis-entrades"
-        class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-        :class="
-          route.path.startsWith('/mis-entrades')
-            ? 'font-bold text-white'
-            : 'font-light text-stone-400 hover:text-red-400'
-        "
-      >
-        Mis entradas
-      </NuxtLink>
+      <template v-if="!esAdmin">
+        <NuxtLink
+          to="/"
+          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+          :class="
+            route.path === '/'
+              ? 'font-bold text-white'
+              : 'font-light text-stone-400 hover:text-red-400'
+          "
+        >
+          Cartelera
+        </NuxtLink>
+        <NuxtLink
+          to="/mis-entrades"
+          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+          :class="
+            route.path.startsWith('/mis-entrades')
+              ? 'font-bold text-white'
+              : 'font-light text-stone-400 hover:text-red-400'
+          "
+        >
+          Mis entradas
+        </NuxtLink>
+      </template>
+      <template v-else>
+        <NuxtLink
+          to="/admin"
+          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+          :class="
+            actiuPanellAdmin
+              ? 'font-bold text-white'
+              : 'font-light text-stone-400 hover:text-red-400'
+          "
+        >
+          Panell
+        </NuxtLink>
+        <NuxtLink
+          to="/admin#temps-real"
+          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+          :class="
+            actiuTempsRealAdmin
+              ? 'font-bold text-white'
+              : 'font-light text-stone-400 hover:text-red-400'
+          "
+        >
+          Temps real
+        </NuxtLink>
+      </template>
     </div>
     <div class="justify-self-end">
       <NuxtLink

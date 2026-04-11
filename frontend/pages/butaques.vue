@@ -56,6 +56,7 @@ const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/ses
   baseURL,
   immediate: !!peliId
 })
+const { data: vendaConfig } = await useFetch('/configuracio-venda', { baseURL })
 const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
   immediate: !!sessioId,
@@ -82,6 +83,64 @@ function formatSessioEtiqueta(sessio) {
 
 const selectedSeients = ref([])
 const reservaEnCurs = ref(false)
+
+/** ISO per seient (resposta servidor) per compte enrere coherent */
+const expiresBySeientId = ref({})
+
+const maxSeientsPermesos = computed(() => vendaConfig.value?.max_seients_per_sessio ?? 8)
+
+const millorExpiracioIso = computed(() => {
+  const vals = Object.values(expiresBySeientId.value).filter(Boolean)
+  if (!vals.length) {
+    return null
+  }
+  return vals.reduce((a, b) => (new Date(a) < new Date(b) ? a : b))
+})
+
+const segonsRestantsReserva = ref(0)
+let tickReservaInterval = null
+
+function actualitzaSegonsReserva() {
+  const iso = millorExpiracioIso.value
+  if (!iso) {
+    segonsRestantsReserva.value = 0
+    return
+  }
+  const ms = new Date(iso).getTime() - Date.now()
+  segonsRestantsReserva.value = Math.max(0, Math.floor(ms / 1000))
+}
+
+const tempsReservaFormat = computed(() => {
+  const t = segonsRestantsReserva.value
+  const m = Math.floor(t / 60)
+  const s = t % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+})
+
+watch(
+  millorExpiracioIso,
+  () => {
+    actualitzaSegonsReserva()
+  },
+  { immediate: true }
+)
+
+watch(
+  seients,
+  (list) => {
+    if (!list || !Array.isArray(list)) {
+      return
+    }
+    const m = {}
+    for (const s of list) {
+      if (s.la_meva_reserva && s.meva_expiracio_iso) {
+        m[s.id] = s.meva_expiracio_iso
+      }
+    }
+    expiresBySeientId.value = m
+  },
+  { immediate: true, deep: true }
+)
 
 function processSeientSeleccionat(data) {
   if (!mateixaSessio(data.sessio_id)) return
@@ -140,10 +199,10 @@ function rejoinSalaAlConnectar() {
   }
 }
 
-/** Preferència Socket.IO + ack; fallback HTTP si el socket no està llest. */
+/** Preferència Socket.IO + ack; fallback HTTP si el socket no està llest. Retorna el cos JSON de Laravel. */
 async function cridarReservarTemporal(body) {
   try {
-    await reservarTemporal({
+    return await reservarTemporal({
       sessioId: body.sessioId,
       seientId: body.seientId,
       estat: body.estat,
@@ -151,12 +210,11 @@ async function cridarReservarTemporal(body) {
     })
   } catch (e) {
     if (e.cause === 'no_socket' || e.cause === 'timeout_reserva' || e.cause === 'empty_ack') {
-      await $fetch(`${gatewayURL}/api/reservar`, {
+      return await $fetch(`${gatewayURL}/api/reservar`, {
         method: 'POST',
         headers: authStore.capcalarsAutenticacio(),
         body
       })
-      return
     }
     throw e
   }
@@ -177,6 +235,7 @@ async function alliberarReservesSeleccionades() {
     )
   )
   selectedSeients.value = []
+  await refreshSeats()
 }
 
 function vaAPagament(to) {
@@ -205,9 +264,15 @@ onMounted(async () => {
   if (sessioId) {
     joinSessio(sessioId)
   }
+
+  tickReservaInterval = setInterval(actualitzaSegonsReserva, 1000)
 })
 
 onUnmounted(() => {
+  if (tickReservaInterval) {
+    clearInterval(tickReservaInterval)
+    tickReservaInterval = null
+  }
   const socket = ensureSocket()
   if (!socket) return
   socket.off('connect', rejoinSalaAlConnectar)
@@ -222,6 +287,11 @@ async function toggleSeient(seient) {
   }
   const index = selectedSeients.value.findIndex((s) => s.id === seient.id)
   const nouEstat = index === -1
+
+  if (nouEstat && selectedSeients.value.length >= maxSeientsPermesos.value) {
+    alert(`Només pots seleccionar fins a ${maxSeientsPermesos.value} seients per sessió.`)
+    return
+  }
 
   reservaEnCurs.value = true
   try {
@@ -238,12 +308,16 @@ async function toggleSeient(seient) {
     } else {
       selectedSeients.value.splice(index, 1)
     }
+    await refreshSeats()
   } catch (e) {
     const status = e.statusCode ?? e.status ?? e.response?.status
     const msg = e.data?.error ?? e.response?._data?.error
     if (status === 401) {
       await authStore.logout()
       navigateTo('/login')
+    } else if (status === 422) {
+      alert(msg || 'Límit de seients assolit.')
+      refreshSeats()
     } else {
       alert(msg || 'No s\'ha pogut reservar el seient')
       refreshSeats()
@@ -254,6 +328,13 @@ async function toggleSeient(seient) {
 }
 
 function getPreu(categoria) {
+  const preus = sessioActual.value?.preus
+  if (preus?.length) {
+    const row = preus.find((p) => p.categoria === categoria)
+    if (row) {
+      return parseFloat(row.preu, 10)
+    }
+  }
   if (categoria === 'VIP') return 9.7
   return 6.7
 }
@@ -288,6 +369,13 @@ const textButaquesSeleccionades = computed(() => {
 
 function anarAPagament() {
   const ids = selectedSeients.value.map((s) => s.id).join(',')
+  if (millorExpiracioIso.value && typeof sessionStorage !== 'undefined') {
+    try {
+      sessionStorage.setItem(`ticketfast_expira_${sessioId}`, millorExpiracioIso.value)
+    } catch (_) {
+      /* ignore */
+    }
+  }
   navigateTo({
     path: '/pago',
     query: {
@@ -504,6 +592,25 @@ function onClickSeient(seient) {
                 <span class="font-mono text-lg font-black text-primary md:text-xl">
                   {{ sessioActual?.data_hora ? new Date(sessioActual.data_hora).toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' }) : '—' }}
                 </span>
+              </div>
+            </div>
+
+            <p class="mb-4 font-body text-xs text-stone-500">
+              Màxim {{ maxSeientsPermesos }} seients per sessió (configuració del sistema).
+            </p>
+
+            <div
+              v-if="millorExpiracioIso && segonsRestantsReserva > 0"
+              class="mb-8 flex items-center gap-3 border border-primary/30 bg-black/30 px-4 py-3"
+            >
+              <span class="material-symbols-outlined text-primary" aria-hidden="true">timer</span>
+              <div>
+                <p class="font-label text-[9px] uppercase tracking-widest text-stone-500">
+                  Temps per finalitzar la reserva
+                </p>
+                <p class="font-mono text-2xl font-black text-primary">
+                  {{ tempsReservaFormat }}
+                </p>
               </div>
             </div>
 

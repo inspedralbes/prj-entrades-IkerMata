@@ -57,6 +57,9 @@ app.post('/api/reservar', function (req, res) {
     }
     axios.post(LARAVEL_API_URL + '/reservar', req.body, { headers: headers })
         .then(function (response) {
+            if (response.data && response.data.ok) {
+                notifyAdminPanellRefresh('reserva-http');
+            }
             res.status(response.status).json(response.data);
         })
         .catch(function (error) {
@@ -136,6 +139,7 @@ app.post('/api/comprar', function (req, res) {
                         seient_ids: seientIds
                     });
                 }
+                notifyAdminPanellRefresh('compra-http');
             }
             res.status(response.status).json(response.data);
         })
@@ -163,16 +167,25 @@ function emitToSessioRoom(sessioId, eventName, payload) {
     io.to(room).emit(eventName, payload);
 }
 
+/** Clients a la sala `admin` (panell d’administració) refresquen mètriques sense polling agressiu. */
+function notifyAdminPanellRefresh(reason) {
+    io.to('admin').emit('admin-panell-refresh', { reason: reason || 'sessio', ts: Date.now() });
+}
+
 function onRedisSessioChannel(event, data) {
     console.log('Redis event:', event, data);
     if (event === redisClient.EVENTS.COMPRA_CREADA) {
         emitToSessioRoom(data.sessio_id, 'compra-creada', data);
+        notifyAdminPanellRefresh('compra');
     } else if (event === redisClient.EVENTS.SEIENT_SELECCIONAT) {
         emitToSessioRoom(data.sessio_id, 'seient-seleccionat', data);
+        notifyAdminPanellRefresh('reserva');
     } else if (event === redisClient.EVENTS.SEIENT_ALLIBERAT) {
         emitToSessioRoom(data.sessio_id, 'seient-alliberat', data);
+        notifyAdminPanellRefresh('alliberament');
     } else if (event === redisClient.EVENTS.AFORO_ACTUALITZAT) {
         emitToSessioRoom(data.sessio_id, 'aforo-actualitzat', data);
+        notifyAdminPanellRefresh('aforo');
     }
 }
 
@@ -183,6 +196,7 @@ function onRedisPeliculaChannel(event, data) {
     console.log('Redis pelicula event:', event, data);
     var peliculaId = data.pelicula_id;
     io.to('pelicula:' + String(peliculaId)).emit('aforo-actualitzat', data);
+    notifyAdminPanellRefresh('aforo-pelicula');
 }
 
 redisClient.subscribe(redisClient.CHANNELS.PELICULA, onRedisPeliculaChannel);
@@ -214,6 +228,11 @@ io.on('connection', function (socket) {
         var room = 'pelicula:' + String(peliculaId);
         socket.join(room);
         console.log('socket', socket.id, 'joined', room);
+    });
+
+    socket.on('unirse-panell-admin', function () {
+        socket.join('admin');
+        console.log('socket', socket.id, 'joined admin panell');
     });
 
     /**

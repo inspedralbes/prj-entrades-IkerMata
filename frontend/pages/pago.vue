@@ -29,6 +29,7 @@ const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/ses
   baseURL,
   immediate: !!peliId
 })
+const { data: vendaCfg } = await useFetch('/configuracio-venda', { baseURL })
 const { data: totsSeients } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
   immediate: !!sessioId
@@ -49,6 +50,13 @@ const seleccionats = computed(() => {
 })
 
 function getPreu(categoria) {
+  const preus = sessioActual.value?.preus
+  if (preus?.length) {
+    const row = preus.find((p) => p.categoria === categoria)
+    if (row) {
+      return parseFloat(row.preu, 10)
+    }
+  }
   if (categoria === 'VIP') return 9.7
   return 6.7
 }
@@ -103,11 +111,30 @@ watch(
 
 const enviant = ref(false)
 
-/** Mateix marge que reserva temporal al servidor (10 min). */
-const segonsRestants = ref(600)
+const segonsRestants = ref(0)
 let intervalId
 
+function inicialitzaCompteEnrere() {
+  const minuts = vendaCfg.value?.reserva_temporal_minuts ?? 5
+  let fiMs = Date.now() + minuts * 60 * 1000
+  if (sessioId && typeof sessionStorage !== 'undefined') {
+    try {
+      const raw = sessionStorage.getItem(`ticketfast_expira_${String(sessioId)}`)
+      if (raw) {
+        const t = new Date(raw).getTime()
+        if (!Number.isNaN(t) && t > Date.now()) {
+          fiMs = t
+        }
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  segonsRestants.value = Math.max(0, Math.floor((fiMs - Date.now()) / 1000))
+}
+
 onMounted(() => {
+  inicialitzaCompteEnrere()
   intervalId = setInterval(() => {
     if (segonsRestants.value > 0) {
       segonsRestants.value -= 1
@@ -156,6 +183,29 @@ watch(
 )
 
 async function enviarCompra() {
+  const nom = String(form.nom || '').trim()
+  const email = String(form.email || '').trim()
+  if (nom.length < 2) {
+    alert('Introdueix un nom vàlid.')
+    return
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('Introdueix un correu electrònic vàlid.')
+    return
+  }
+  const digits = form.numeroTargeta.replace(/\D/g, '')
+  if (digits.length < 16) {
+    alert('El número de targeta ha de tenir 16 dígits (demo).')
+    return
+  }
+  if (!/^\d{2}\/\d{2}$/.test(form.caducitat || '')) {
+    alert('La caducitat ha de ser MM/AA.')
+    return
+  }
+  if (!/^\d{3,4}$/.test(form.cvv || '')) {
+    alert('El CVC no és vàlid.')
+    return
+  }
   enviant.value = true
   try {
     const sessioNum = parseInt(String(sessioId), 10)

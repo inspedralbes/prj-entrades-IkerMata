@@ -7,42 +7,15 @@ const route = useRoute()
 const baseURL = useApiBase()
 const authStore = useAuthStore()
 const router = useRouter()
-const { onCatalogActualitzat } = useSocket()
+const { onCatalogActualitzat, ensureSocket, joinPanellAdmin, onAdminPanellRefresh } = useSocket()
 
 const { data: pelis, refresh: refreshPelis } = await useFetch('/peliculas', { baseURL })
 
 const sales = ref([])
 
 let offCatalogActualitzat = () => {}
-
-onMounted(async () => {
-  await authStore.syncUsuariSiCal(baseURL)
-  if (!authStore.user || authStore.user.rol !== 'admin') {
-    router.push('/')
-    return
-  }
-  try {
-    sales.value = await $fetch(`${toValue(baseURL)}/sales`, {
-      headers: authStore.capcalarsAutenticacio()
-    })
-  } catch (_) {
-    sales.value = []
-  }
-
-  offCatalogActualitzat = onCatalogActualitzat(async (data) => {
-    await refreshPelis()
-    if (data?.scope === 'peliculas' && peliSessioId.value) {
-      await carregarSessions()
-    }
-    if (data?.scope === 'sesiones' && String(data.pelicula_id) === String(peliSessioId.value)) {
-      await carregarSessions()
-    }
-  })
-})
-
-onUnmounted(() => {
-  offCatalogActualitzat()
-})
+let offAdminPanell = () => {}
+let debouncePanellTimer = null
 
 const peliSessioId = ref('')
 const sessioList = ref([])
@@ -187,6 +160,117 @@ const formulari = ref({ titol: '', descripcio: '', imatge_url: '', durada_minuts
 const guardantPeli = ref(false)
 const esborrant = ref(false)
 
+const panellTempsReal = ref(null)
+const informesResum = ref(null)
+const carregantPanell = ref(false)
+const carregantInformes = ref(false)
+let intervalPanell = null
+
+async function carregarPanellTempsReal() {
+  if (!authStore.user || authStore.user.rol !== 'admin') {
+    return
+  }
+  carregantPanell.value = true
+  try {
+    const root = toValue(baseURL)
+    panellTempsReal.value = await $fetch(`${root}/admin/panell-temps-real`, {
+      headers: authStore.capcalarsAutenticacio()
+    })
+  } catch (_) {
+    panellTempsReal.value = null
+  } finally {
+    carregantPanell.value = false
+  }
+}
+
+async function carregarInformesResum() {
+  if (!authStore.user || authStore.user.rol !== 'admin') {
+    return
+  }
+  carregantInformes.value = true
+  try {
+    const root = toValue(baseURL)
+    informesResum.value = await $fetch(`${root}/admin/informes-resum`, {
+      headers: authStore.capcalarsAutenticacio()
+    })
+  } catch (_) {
+    informesResum.value = null
+  } finally {
+    carregantInformes.value = false
+  }
+}
+
+function programarActualitzacioPanell() {
+  if (debouncePanellTimer) {
+    clearTimeout(debouncePanellTimer)
+  }
+  debouncePanellTimer = setTimeout(async () => {
+    debouncePanellTimer = null
+    await carregarPanellTempsReal()
+    await carregarInformesResum()
+  }, 250)
+}
+
+function unirseSocketAdmin() {
+  joinPanellAdmin()
+}
+
+onMounted(async () => {
+  await authStore.syncUsuariSiCal(baseURL)
+  if (!authStore.user || authStore.user.rol !== 'admin') {
+    router.push('/')
+    return
+  }
+  try {
+    sales.value = await $fetch(`${toValue(baseURL)}/sales`, {
+      headers: authStore.capcalarsAutenticacio()
+    })
+  } catch (_) {
+    sales.value = []
+  }
+
+  offCatalogActualitzat = onCatalogActualitzat(async (data) => {
+    await refreshPelis()
+    if (data?.scope === 'peliculas' && peliSessioId.value) {
+      await carregarSessions()
+    }
+    if (data?.scope === 'sesiones' && String(data.pelicula_id) === String(peliSessioId.value)) {
+      await carregarSessions()
+    }
+    await carregarPanellTempsReal()
+  })
+
+  const socket = ensureSocket()
+  if (socket) {
+    socket.on('connect', unirseSocketAdmin)
+    unirseSocketAdmin()
+  }
+  offAdminPanell = onAdminPanellRefresh(() => {
+    programarActualitzacioPanell()
+  })
+
+  await carregarPanellTempsReal()
+  await carregarInformesResum()
+  intervalPanell = setInterval(carregarPanellTempsReal, 60000)
+})
+
+onUnmounted(() => {
+  offCatalogActualitzat()
+  offAdminPanell()
+  const sock = ensureSocket()
+  if (sock) {
+    sock.off('connect', unirseSocketAdmin)
+  }
+  if (debouncePanellTimer) {
+    clearTimeout(debouncePanellTimer)
+    debouncePanellTimer = null
+  }
+  if (intervalPanell) {
+    clearInterval(intervalPanell)
+    intervalPanell = null
+  }
+})
+
 function novaPeli() {
   editantId.value = null
   formulari.value = { titol: '', descripcio: '', imatge_url: '', durada_minuts: 60 }
@@ -251,10 +335,13 @@ function retallDescripcio(t) {
   <div
     class="min-h-screen overflow-x-hidden bg-surface-container-lowest font-body text-on-surface selection:bg-primary selection:text-on-primary-fixed"
   >
-    <TicketFastNav />
+    <TicketFastNav variant="admin" />
 
     <main class="mx-auto max-w-6xl px-4 pb-28 pt-28 md:px-8 md:pb-20 lg:px-10">
-      <div class="mb-10 flex flex-col gap-4 border-b border-stone-800 pb-8 md:flex-row md:items-end md:justify-between">
+      <div
+        id="admin-panell"
+        class="scroll-mt-28 mb-10 flex flex-col gap-4 border-b border-stone-800 pb-8 md:flex-row md:items-end md:justify-between"
+      >
         <div>
           <p class="font-label mb-2 text-[10px] font-bold uppercase tracking-[0.35em] text-primary">
             Administració
@@ -396,6 +483,168 @@ function retallDescripcio(t) {
       <div v-if="!pelis?.length" class="border border-dashed border-stone-700 py-12 text-center text-stone-500">
         No hi ha pel·lícules.
       </div>
+
+      <section id="temps-real" class="scroll-mt-28 mt-16 border-t border-stone-800 pt-12">
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 class="font-headline text-2xl font-bold uppercase text-white md:text-3xl">
+              Panell temps real
+            </h2>
+            <p class="mt-2 font-body text-sm text-stone-500">
+              Reserves actives, ocupació per sessió i imports (dades del servidor).
+            </p>
+          </div>
+          <button
+            type="button"
+            class="border border-stone-600 px-4 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-stone-300 transition hover:border-primary hover:text-primary disabled:opacity-40"
+            :disabled="carregantPanell"
+            @click="carregarPanellTempsReal"
+          >
+            {{ carregantPanell ? 'Actualitzant…' : 'Actualitzar' }}
+          </button>
+        </div>
+
+        <div v-if="panellTempsReal" class="mt-8 space-y-6">
+          <div class="flex flex-wrap gap-8 border border-stone-800 bg-black/30 px-6 py-4">
+            <div>
+              <p class="font-label text-[9px] uppercase tracking-widest text-stone-500">
+                Reserves temporals actives
+              </p>
+              <p class="font-headline text-2xl text-primary">
+                {{ panellTempsReal.reserves_actives_total }}
+              </p>
+            </div>
+            <div>
+              <p class="font-label text-[9px] uppercase tracking-widest text-stone-500">
+                Usuaris amb reserva activa
+              </p>
+              <p class="font-headline text-2xl text-white">
+                {{ panellTempsReal.usuaris_amb_reserva_activa }}
+              </p>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto border border-stone-800 bg-black/20">
+            <table class="w-full min-w-[720px] border-collapse text-left text-sm">
+              <thead>
+                <tr class="border-b border-stone-800 bg-stone-950/90">
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Sessió</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Pel·lícula</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Venuts</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Res. temp.</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">% ocup.</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Import sessió</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="row in panellTempsReal.per_sessio"
+                  :key="'pt-' + row.sessio_id"
+                  class="border-b border-stone-800/80"
+                >
+                  <td class="px-3 py-2 font-mono text-xs text-stone-400">{{ row.sessio_id }}</td>
+                  <td class="max-w-[180px] px-3 py-2 text-stone-300">{{ row.peli_titol }}</td>
+                  <td class="px-3 py-2 text-white">{{ row.places_venudes }} / {{ row.capacitat_sala }}</td>
+                  <td class="px-3 py-2 text-amber-200/90">{{ row.seients_reservats_temporalment }}</td>
+                  <td class="px-3 py-2 text-stone-400">{{ row.percentatge_ocupacio_vendes }}%</td>
+                  <td class="px-3 py-2 text-primary">{{ row.import_total_sessio_eur }} €</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p v-else-if="!carregantPanell" class="mt-6 text-sm text-stone-600">
+          No s’han pogut carregar les mètriques.
+        </p>
+      </section>
+
+      <section id="informes" class="scroll-mt-28 mt-16 border-t border-stone-800 pt-12">
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 class="font-headline text-2xl font-bold uppercase text-white md:text-3xl">
+              Informes
+            </h2>
+            <p class="mt-2 font-body text-sm text-stone-500">
+              Recaptació total, per categoria i evolució diària (30 dies).
+            </p>
+          </div>
+          <button
+            type="button"
+            class="border border-stone-600 px-4 py-2 font-label text-[10px] font-bold uppercase tracking-wider text-stone-300 transition hover:border-primary hover:text-primary disabled:opacity-40"
+            :disabled="carregantInformes"
+            @click="carregarInformesResum"
+          >
+            {{ carregantInformes ? 'Carregant…' : 'Actualitzar' }}
+          </button>
+        </div>
+
+        <div v-if="informesResum" class="mt-8 space-y-8">
+          <p class="font-body text-stone-300">
+            Recaptació total:
+            <span class="font-headline text-xl text-primary">{{ informesResum.recaptacio_total_eur }} €</span>
+          </p>
+
+          <div class="overflow-x-auto border border-stone-800 bg-black/20">
+            <table class="w-full min-w-[400px] border-collapse text-left text-sm">
+              <thead>
+                <tr class="border-b border-stone-800 bg-stone-950/90">
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Categoria</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Unitats</th>
+                  <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="cat in informesResum.per_categoria"
+                  :key="'cat-' + cat.categoria"
+                  class="border-b border-stone-800/80"
+                >
+                  <td class="px-3 py-2 text-white">{{ cat.categoria }}</td>
+                  <td class="px-3 py-2 text-stone-400">{{ cat.unitats }}</td>
+                  <td class="px-3 py-2 text-primary">{{ cat.total_eur }} €</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <h3 class="font-headline mb-4 text-sm uppercase tracking-wider text-stone-400">
+              Evolució diària (30 dies)
+            </h3>
+            <div class="overflow-x-auto border border-stone-800 bg-black/20">
+              <table class="w-full min-w-[360px] border-collapse text-left text-sm">
+                <thead>
+                  <tr class="border-b border-stone-800 bg-stone-950/90">
+                    <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Data</th>
+                    <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Compres</th>
+                    <th class="px-3 py-3 font-label text-[9px] uppercase tracking-widest text-stone-500">Import</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="ev in informesResum.evolucio_diaria_30_dies"
+                    :key="'ev-' + ev.data"
+                    class="border-b border-stone-800/80"
+                  >
+                    <td class="px-3 py-2 font-mono text-xs text-stone-400">{{ ev.data }}</td>
+                    <td class="px-3 py-2 text-white">{{ ev.compres }}</td>
+                    <td class="px-3 py-2 text-stone-300">{{ ev.import_eur }} €</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p
+              v-if="!informesResum.evolucio_diaria_30_dies?.length"
+              class="mt-4 text-sm text-stone-600"
+            >
+              Encara no hi ha compres en aquest període.
+            </p>
+          </div>
+        </div>
+        <p v-else-if="!carregantInformes" class="mt-6 text-sm text-stone-600">
+          No s’han pogut carregar els informes.
+        </p>
+      </section>
 
       <section class="mt-16 border-t border-stone-800 pt-12">
         <h2 class="font-headline text-2xl font-bold uppercase text-white md:text-3xl">
@@ -563,20 +812,20 @@ function retallDescripcio(t) {
 
     <div class="crimson-glass fixed bottom-0 left-0 z-50 grid w-full grid-cols-2 items-center p-4 md:hidden">
       <NuxtLink
-        to="/"
+        to="/admin"
         class="flex flex-col items-center gap-1"
-        :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
+        :class="route.path === '/admin' && route.hash !== '#temps-real' ? 'text-primary' : 'text-stone-400'"
       >
-        <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="material-symbols-outlined">dashboard</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Panell</span>
       </NuxtLink>
       <NuxtLink
-        to="/mis-entrades"
+        to="/admin#temps-real"
         class="flex flex-col items-center gap-1"
-        :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
+        :class="route.hash === '#temps-real' ? 'text-primary' : 'text-stone-400'"
       >
-        <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="material-symbols-outlined">monitoring</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Temps real</span>
       </NuxtLink>
     </div>
   </div>
