@@ -1,8 +1,9 @@
 <script setup>
 definePageMeta({
-  layout: 'default'
+  layout: 'blank'
 })
 
+const route = useRoute()
 const baseURL = useApiBase()
 const authStore = useAuthStore()
 const router = useRouter()
@@ -239,297 +240,344 @@ async function esborrarPeli(id) {
 function cancel() {
   mostraForm.value = false
 }
+
+function retallDescripcio(t) {
+  if (!t) return '—'
+  return t.length > 50 ? `${t.substring(0, 50)}…` : t
+}
 </script>
 
 <template>
-  <div class="admin">
-    <h1>Panell d'Administració</h1>
-    
-    <div class="actions">
-      <button type="button" :disabled="guardantPeli || esborrant" @click="novaPeli">Nou Pel·lícula</button>
-    </div>
+  <div
+    class="min-h-screen overflow-x-hidden bg-surface-container-lowest font-body text-on-surface selection:bg-primary selection:text-on-primary-fixed"
+  >
+    <TicketFastNav />
 
-    <div v-if="mostraForm" class="formulari">
-      <h2>{{ editantId ? 'Editar' : 'Nova' }} Pel·lícula</h2>
-      <label>
-        Títol:
-        <input v-model="formulari.titol" type="text" required>
-      </label>
-      <label>
-        Descripció:
-        <textarea v-model="formulari.descripcio" required></textarea>
-      </label>
-      <label>
-        Imatge URL:
-        <input v-model="formulari.imatge_url" type="url">
-      </label>
-      <label>
-        Durada (minuts):
-        <input v-model="formulari.durada_minuts" type="number" min="1">
-      </label>
-      <div class="btns">
-        <button type="button" :disabled="guardantPeli" @click="desarPeli">
-          {{ guardantPeli ? 'Desant…' : 'Desar' }}
-        </button>
-        <button type="button" :disabled="guardantPeli" @click="cancel" class="cancel">Cancel·lar</button>
+    <main class="mx-auto max-w-6xl px-4 pb-28 pt-28 md:px-8 md:pb-20 lg:px-10">
+      <div class="mb-10 flex flex-col gap-4 border-b border-stone-800 pb-8 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p class="font-label mb-2 text-[10px] font-bold uppercase tracking-[0.35em] text-primary">
+            Administració
+          </p>
+          <h1 class="font-headline text-3xl font-bold uppercase tracking-tight text-white md:text-4xl">
+            Panell d’administració
+          </h1>
+        </div>
+        <span
+          class="inline-flex w-fit border border-primary/40 bg-stone-950 px-3 py-1 font-label text-[10px] font-bold uppercase tracking-widest text-primary"
+        >
+          Admin
+        </span>
       </div>
-    </div>
 
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Títol</th>
-          <th>Descripció</th>
-          <th>Durada</th>
-          <th>Estat</th>
-          <th>Accions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="p in pelis" :key="p.id">
-          <td>{{ p.id }}</td>
-          <td>{{ p.titol }}</td>
-          <td>{{ p.descripcio?.substring(0, 50) }}...</td>
-          <td>{{ p.durada_minuts }} min</td>
-          <td>{{ p.estat }}</td>
-          <td>
-            <button type="button" :disabled="guardantPeli || esborrant" @click="editarPeli(p)">Editar</button>
-            <button type="button" :disabled="guardantPeli || esborrant" @click="esborrarPeli(p.id)" class="del">
-              {{ esborrant ? '…' : 'Esborrar' }}
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+      <div class="mb-8 flex flex-wrap gap-3">
+        <button
+          type="button"
+          class="border border-white bg-white px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-black transition hover:bg-primary hover:text-on-primary-fixed disabled:cursor-not-allowed disabled:opacity-50"
+          :disabled="guardantPeli || esborrant"
+          @click="novaPeli"
+        >
+          Nova pel·lícula
+        </button>
+      </div>
 
-    <div v-if="!pelis?.length" class="buit">
-      No hi ha pel·lícules.
-    </div>
-
-    <section class="bloc-sessions">
-      <h2>Sessions (passis)</h2>
-      <p class="hint">Selecciona una pel·lícula per veure i afegir passis (sala i data).</p>
-      <label class="sel-peli">
-        Pel·lícula
-        <select v-model="peliSessioId" :disabled="guardantPeli || esborrant">
-          <option value="">— Tria una pel·lícula —</option>
-          <option v-for="p in pelis" :key="'sess-' + p.id" :value="String(p.id)">{{ p.titol }}</option>
-        </select>
-      </label>
-
-      <template v-if="peliSessioId">
-        <div class="actions sessio-actions">
+      <div
+        v-if="mostraForm"
+        class="mb-10 border border-stone-800 bg-surface-container/90 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.35)] md:p-8"
+      >
+        <h2 class="font-headline mb-6 text-xl font-bold uppercase text-white">
+          {{ editantId ? 'Editar' : 'Nova' }} pel·lícula
+        </h2>
+        <div class="grid gap-6 md:grid-cols-2">
+          <label class="block md:col-span-2">
+            <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Títol</span>
+            <input
+              v-model="formulari.titol"
+              type="text"
+              required
+              class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-2 text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+            >
+          </label>
+          <label class="block md:col-span-2">
+            <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Descripció</span>
+            <textarea
+              v-model="formulari.descripcio"
+              required
+              rows="4"
+              class="mt-2 w-full border border-stone-700 bg-stone-950/50 px-3 py-2 text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </label>
+          <label class="block">
+            <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">URL imatge</span>
+            <input
+              v-model="formulari.imatge_url"
+              type="url"
+              class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-2 text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+            >
+          </label>
+          <label class="block">
+            <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Durada (min)</span>
+            <input
+              v-model.number="formulari.durada_minuts"
+              type="number"
+              min="1"
+              class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-2 text-white focus:border-primary focus:outline-none focus:ring-0"
+            >
+          </label>
+        </div>
+        <div class="mt-8 flex flex-wrap gap-3">
           <button
             type="button"
-            :disabled="guardantSessio || esborrantSessio || !sales?.length"
-            @click="novaSessio"
+            class="border border-white bg-white px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-black transition hover:bg-primary hover:text-on-primary-fixed disabled:opacity-50"
+            :disabled="guardantPeli"
+            @click="desarPeli"
           >
-            Nova sessió
+            {{ guardantPeli ? 'Desant…' : 'Desar' }}
+          </button>
+          <button
+            type="button"
+            class="border border-stone-600 px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-stone-400 transition hover:border-stone-500 hover:text-white disabled:opacity-50"
+            :disabled="guardantPeli"
+            @click="cancel"
+          >
+            Cancel·lar
           </button>
         </div>
+      </div>
 
-        <div v-if="mostraFormSessio" class="formulari">
-          <h3>{{ editantSessioId ? 'Editar sessió' : 'Nova sessió' }}</h3>
-          <label>
-            Sala
-            <select v-model="formSessio.sala_id" :disabled="guardantSessio">
-              <option v-for="s in sales" :key="'sala-' + s.id" :value="s.id">{{ s.nom }} ({{ s.capacitat }} places)</option>
-            </select>
-          </label>
-          <label>
-            Data i hora
-            <input v-model="formSessio.data_hora" type="datetime-local" :disabled="guardantSessio">
-          </label>
-          <div class="btns">
-            <button type="button" :disabled="guardantSessio" @click="desarSessio">
-              {{ guardantSessio ? 'Desant…' : 'Desar sessió' }}
-            </button>
-            <button type="button" :disabled="guardantSessio" class="cancel" @click="cancelSessio">Cancel·lar</button>
-          </div>
-        </div>
-
-        <div v-if="carregantSessions" class="estat">Carregant sessions…</div>
-        <table v-else class="taula-sessions">
+      <div class="overflow-x-auto border border-stone-800 bg-black/20">
+        <table class="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
-            <tr>
-              <th>ID</th>
-              <th>Sala</th>
-              <th>Data i hora</th>
-              <th>Butaques lliures</th>
-              <th>Accions</th>
+            <tr class="border-b border-stone-800 bg-stone-950/90">
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">ID</th>
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Títol</th>
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Descripció</th>
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Durada</th>
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Estat</th>
+              <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Accions</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="s in sessioList" :key="'sessio-' + s.id">
-              <td>{{ s.id }}</td>
-              <td>{{ s.sala_nom }}</td>
-              <td>{{ s.data_hora }}</td>
-              <td>{{ s.aforo_disponible }}</td>
-              <td>
+            <tr
+              v-for="p in pelis"
+              :key="p.id"
+              class="border-b border-stone-800/80 transition hover:bg-stone-900/40"
+            >
+              <td class="px-4 py-3 font-mono text-xs text-stone-400">{{ p.id }}</td>
+              <td class="px-4 py-3 font-medium text-white">{{ p.titol }}</td>
+              <td class="max-w-[220px] px-4 py-3 text-stone-400">{{ retallDescripcio(p.descripcio) }}</td>
+              <td class="px-4 py-3 text-stone-300">{{ p.durada_minuts }} min</td>
+              <td class="px-4 py-3">
+                <span class="font-label text-[10px] uppercase tracking-wider text-primary">{{ p.estat }}</span>
+              </td>
+              <td class="px-4 py-3">
                 <button
                   type="button"
-                  :disabled="guardantSessio || esborrantSessio"
-                  @click="editarSessio(s)"
+                  class="mr-2 border border-stone-600 px-3 py-1.5 font-label text-[10px] font-bold uppercase tracking-wider text-stone-300 transition hover:border-primary hover:text-primary disabled:opacity-40"
+                  :disabled="guardantPeli || esborrant"
+                  @click="editarPeli(p)"
                 >
                   Editar
                 </button>
                 <button
                   type="button"
-                  class="del"
-                  :disabled="guardantSessio || esborrantSessio"
-                  @click="esborrarSessio(s.id)"
+                  class="border border-red-900/60 bg-red-950/30 px-3 py-1.5 font-label text-[10px] font-bold uppercase tracking-wider text-red-300 transition hover:bg-red-950/60 disabled:opacity-40"
+                  :disabled="guardantPeli || esborrant"
+                  @click="esborrarPeli(p.id)"
                 >
-                  {{ esborrantSessio ? '…' : 'Esborrar' }}
+                  {{ esborrant ? '…' : 'Esborrar' }}
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="!carregantSessions && !sessioList?.length" class="buit">
-          Cap sessió per aquesta pel·lícula. Crea’n una amb «Nova sessió».
-        </div>
-      </template>
-    </section>
+      </div>
+
+      <div v-if="!pelis?.length" class="border border-dashed border-stone-700 py-12 text-center text-stone-500">
+        No hi ha pel·lícules.
+      </div>
+
+      <section class="mt-16 border-t border-stone-800 pt-12">
+        <h2 class="font-headline text-2xl font-bold uppercase text-white md:text-3xl">
+          Sessions (passis)
+        </h2>
+        <p class="mt-2 font-body text-sm text-stone-500">
+          Selecciona una pel·lícula per veure i afegir passis (sala i data).
+        </p>
+
+        <label class="mt-8 block max-w-xl">
+          <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Pel·lícula</span>
+          <select
+            v-model="peliSessioId"
+            :disabled="guardantPeli || esborrant"
+            class="mt-2 w-full border border-stone-700 bg-stone-950 px-4 py-3 font-body text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">
+              — Tria una pel·lícula —
+            </option>
+            <option v-for="p in pelis" :key="'sess-' + p.id" :value="String(p.id)">
+              {{ p.titol }}
+            </option>
+          </select>
+        </label>
+
+        <template v-if="peliSessioId">
+          <div class="mt-6">
+            <button
+              type="button"
+              class="border border-white/80 bg-transparent px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+              :disabled="guardantSessio || esborrantSessio || !sales?.length"
+              @click="novaSessio"
+            >
+              Nova sessió
+            </button>
+          </div>
+
+          <div
+            v-if="mostraFormSessio"
+            class="mt-8 border border-stone-800 bg-surface-container/90 p-6 md:p-8"
+          >
+            <h3 class="font-headline mb-6 text-lg font-bold uppercase text-white">
+              {{ editantSessioId ? 'Editar sessió' : 'Nova sessió' }}
+            </h3>
+            <div class="grid gap-6 md:max-w-xl">
+              <label class="block">
+                <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Sala</span>
+                <select
+                  v-model="formSessio.sala_id"
+                  :disabled="guardantSessio"
+                  class="mt-2 w-full border border-stone-700 bg-stone-950 px-4 py-3 text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  <option v-for="s in sales" :key="'sala-' + s.id" :value="s.id">
+                    {{ s.nom }} ({{ s.capacitat }} places)
+                  </option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Data i hora</span>
+                <input
+                  v-model="formSessio.data_hora"
+                  type="datetime-local"
+                  :disabled="guardantSessio"
+                  class="mt-2 w-full border border-stone-700 bg-stone-950 px-4 py-3 text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+              </label>
+            </div>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <button
+                type="button"
+                class="border border-white bg-white px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-black transition hover:bg-primary hover:text-on-primary-fixed disabled:opacity-50"
+                :disabled="guardantSessio"
+                @click="desarSessio"
+              >
+                {{ guardantSessio ? 'Desant…' : 'Desar sessió' }}
+              </button>
+              <button
+                type="button"
+                class="border border-stone-600 px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-stone-400 transition hover:text-white disabled:opacity-50"
+                :disabled="guardantSessio"
+                @click="cancelSessio"
+              >
+                Cancel·lar
+              </button>
+            </div>
+          </div>
+
+          <div v-if="carregantSessions" class="mt-8 text-sm text-stone-500">
+            Carregant sessions…
+          </div>
+          <div v-else class="mt-8 overflow-x-auto border border-stone-800 bg-black/20">
+            <table class="w-full min-w-[600px] border-collapse text-left text-sm">
+              <thead>
+                <tr class="border-b border-stone-800 bg-stone-950/90">
+                  <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">ID</th>
+                  <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Sala</th>
+                  <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Data i hora</th>
+                  <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Butaques lliures</th>
+                  <th class="px-4 py-4 font-label text-[10px] uppercase tracking-widest text-stone-500">Accions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="s in sessioList"
+                  :key="'sessio-' + s.id"
+                  class="border-b border-stone-800/80 transition hover:bg-stone-900/40"
+                >
+                  <td class="px-4 py-3 font-mono text-xs text-stone-400">{{ s.id }}</td>
+                  <td class="px-4 py-3 text-white">{{ s.sala_nom }}</td>
+                  <td class="px-4 py-3 text-stone-300">{{ s.data_hora }}</td>
+                  <td class="px-4 py-3 text-primary">{{ s.aforo_disponible }}</td>
+                  <td class="px-4 py-3">
+                    <button
+                      type="button"
+                      class="mr-2 border border-stone-600 px-3 py-1.5 font-label text-[10px] font-bold uppercase tracking-wider text-stone-300 transition hover:border-primary hover:text-primary disabled:opacity-40"
+                      :disabled="guardantSessio || esborrantSessio"
+                      @click="editarSessio(s)"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="border border-red-900/60 bg-red-950/30 px-3 py-1.5 font-label text-[10px] font-bold uppercase tracking-wider text-red-300 transition hover:bg-red-950/60 disabled:opacity-40"
+                      :disabled="guardantSessio || esborrantSessio"
+                      @click="esborrarSessio(s.id)"
+                    >
+                      {{ esborrantSessio ? '…' : 'Esborrar' }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            v-if="!carregantSessions && !sessioList?.length"
+            class="mt-6 border border-dashed border-stone-700 py-10 text-center text-sm text-stone-500"
+          >
+            Cap sessió per aquesta pel·lícula. Crea’n una amb «Nova sessió».
+          </div>
+        </template>
+      </section>
+    </main>
+
+    <footer
+      class="flex w-full flex-col items-center justify-center gap-12 border-t-0 bg-stone-950 px-8 py-16 lg:py-20"
+    >
+      <div class="font-headline text-2xl font-black tracking-[0.3em] text-red-600 md:text-3xl">
+        TICKET-FAST
+      </div>
+      <div class="flex flex-wrap justify-center gap-8 md:gap-10">
+        <NuxtLink
+          to="/"
+          class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
+        >
+          Cartelera
+        </NuxtLink>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+      </div>
+      <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
+        © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.
+      </p>
+    </footer>
+
+    <div class="crimson-glass fixed bottom-0 left-0 z-50 grid w-full grid-cols-2 items-center p-4 md:hidden">
+      <NuxtLink
+        to="/"
+        class="flex flex-col items-center gap-1"
+        :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">movie</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+      </NuxtLink>
+      <NuxtLink
+        to="/mis-entrades"
+        class="flex flex-col items-center gap-1"
+        :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+      </NuxtLink>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.admin {
-  padding: 20px;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-h1 { margin-bottom: 20px; }
-
-.actions { margin-bottom: 20px; }
-
-.actions button {
-  background: #28a745;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.formulari {
-  background: #f5f5f5;
-  padding: 20px;
-  margin-bottom: 20px;
-  border-radius: 8px;
-}
-
-.formulari label {
-  display: block;
-  margin-bottom: 12px;
-}
-
-.formulari input,
-.formulari textarea {
-  width: 100%;
-  padding: 8px;
-  box-sizing: border-box;
-}
-
-.formulari textarea {
-  height: 80px;
-}
-
-.btns { margin-top: 16px; }
-
-.btns button {
-  margin-right: 10px;
-  padding: 8px 16px;
-  cursor: pointer;
-}
-
-.btns .cancel {
-  background: #6c757d;
-  color: white;
-  border: none;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-th, td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-th { background: #f8f9fa; }
-
-td button {
-  margin-right: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-td button:disabled,
-.btns button:disabled,
-.actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-td .del {
-  background: #dc3545;
-  color: white;
-  border: none;
-}
-
-.buit {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-}
-
-.bloc-sessions {
-  margin-top: 48px;
-  padding-top: 24px;
-  border-top: 1px solid #ddd;
-}
-
-.bloc-sessions h2 {
-  margin-bottom: 8px;
-}
-
-.hint {
-  color: #666;
-  font-size: 0.95rem;
-  margin-bottom: 16px;
-}
-
-.sel-peli {
-  display: block;
-  margin-bottom: 16px;
-}
-
-.sel-peli select {
-  margin-left: 8px;
-  min-width: 220px;
-  padding: 8px;
-}
-
-.sessio-actions {
-  margin-bottom: 16px;
-}
-
-.taula-sessions {
-  margin-top: 12px;
-}
-
-.estat {
-  padding: 12px;
-  color: #555;
-}
-
-.bloc-sessions h3 {
-  margin-top: 0;
-}
-</style>

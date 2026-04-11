@@ -18,7 +18,6 @@ function mateixaSessio(id) {
 }
 
 const MAX_PENDING_SOCKET_EVENTS = 64
-/** Esdeveniments rebuts abans que `useFetch` acabi (o amb dades readonly): es processen després. */
 const pendingSeatSocketEvents = ref([])
 
 function patchSeient(seientId, patch) {
@@ -27,7 +26,6 @@ function patchSeient(seientId, patch) {
   const id = Number(seientId)
   const i = list.findIndex((s) => Number(s.id) === id)
   if (i === -1) return
-  // Reassignació nova array: el `data` de useFetch sovint és readonly; mutar list[i] no redibuixa.
   seients.value = list.map((s, idx) => (idx === i ? { ...s, ...patch } : s))
 }
 
@@ -54,11 +52,33 @@ function flushPendingSeatSocketEvents() {
 }
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
+const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
+  baseURL,
+  immediate: !!peliId
+})
 const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
   immediate: !!sessioId,
   headers: computed(() => authStore.capcalarsAutenticacio())
 })
+
+const sessioActual = computed(() => {
+  const list = sessionsList.value
+  if (!list || !Array.isArray(list) || !sessioId) {
+    return null
+  }
+  return list.find((s) => Number(s.id) === Number(sessioId)) ?? null
+})
+
+function formatSessioEtiqueta(sessio) {
+  if (!sessio?.data_hora) {
+    return sessio?.sala_nom || ''
+  }
+  const d = new Date(sessio.data_hora)
+  const t = d.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' })
+  const sala = sessio.sala_nom || 'Sala'
+  return `${sala} · ${t}`
+}
 
 const selectedSeients = ref([])
 const reservaEnCurs = ref(false)
@@ -120,7 +140,6 @@ function rejoinSalaAlConnectar() {
   }
 }
 
-/** Allibera totes les reserves temporals de l'usuari en aquesta sessió (POST estat: false). */
 async function alliberarReservesSeleccionades() {
   const seats = selectedSeients.value.slice()
   if (!sessioId || seats.length === 0) {
@@ -160,7 +179,6 @@ onMounted(async () => {
   const socket = ensureSocket()
   if (!socket) return
 
-  // Listeners abans de unir-se a la sala: evita perdre esdeveniments ràpids en el primer connect.
   socket.on('connect', rejoinSalaAlConnectar)
   socket.on('seient-seleccionat', onSeientSeleccionat)
   socket.on('seient-alliberat', onSeientAlliberat)
@@ -184,7 +202,7 @@ async function toggleSeient(seient) {
   if (reservaEnCurs.value) {
     return
   }
-  const index = selectedSeients.value.findIndex(s => s.id === seient.id)
+  const index = selectedSeients.value.findIndex((s) => s.id === seient.id)
   const nouEstat = index === -1
 
   reservaEnCurs.value = true
@@ -228,8 +246,32 @@ const totalPreu = computed(() => {
   return selectedSeients.value.reduce((sum, s) => sum + getPreu(s.categoria), 0)
 })
 
+const etiquetaTarifes = computed(() => {
+  const sel = selectedSeients.value
+  if (!sel.length) {
+    return '—'
+  }
+  const vip = sel.filter((s) => s.categoria === 'VIP').length
+  const norm = sel.filter((s) => s.categoria !== 'VIP').length
+  const parts = []
+  if (vip) {
+    parts.push(`${vip} VIP`)
+  }
+  if (norm) {
+    parts.push(`${norm} Normal`)
+  }
+  return parts.join(' · ')
+})
+
+const textButaquesSeleccionades = computed(() => {
+  if (!selectedSeients.value.length) {
+    return '—'
+  }
+  return selectedSeients.value.map((s) => `${s.fila}${s.numero}`).join(', ')
+})
+
 function anarAPagament() {
-  const ids = selectedSeients.value.map(s => s.id).join(',')
+  const ids = selectedSeients.value.map((s) => s.id).join(',')
   navigateTo({
     path: '/pago',
     query: {
@@ -247,7 +289,6 @@ watch(
   }
 )
 
-/** Restaura la selecció des de la resposta inicial (la_meva_reserva) després de recarregar. */
 watch(
   () => seients.value,
   (list) => {
@@ -262,178 +303,289 @@ watch(
   { immediate: true }
 )
 
-/** Quan arriben els seients des de l’API, aplica esdeveniments Socket en cua. */
 watch([seients, seatsLoading], () => {
   flushPendingSeatSocketEvents()
 })
+
+/** Files A…E: la fila A (davant) queda just sota la pantalla. */
+const filesPerMostrar = computed(() => {
+  if (!seients.value?.length) {
+    return []
+  }
+  const map = new Map()
+  for (const s of seients.value) {
+    const f = String(s.fila)
+    if (!map.has(f)) {
+      map.set(f, [])
+    }
+    map.get(f).push(s)
+  }
+  for (const arr of map.values()) {
+    arr.sort((a, b) => a.numero - b.numero)
+  }
+  const filas = [...map.keys()].sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }))
+  return filas.map((fila) => ({ fila, seats: map.get(fila) }))
+})
+
+function meitatsFila(seats) {
+  if (!seats?.length) {
+    return []
+  }
+  const mid = Math.ceil(seats.length / 2)
+  return [seats.slice(0, mid), seats.slice(mid)]
+}
+
+function esSeientSeleccionat(seient) {
+  return selectedSeients.value.some((s) => s.id === seient.id)
+}
+
+function classeSeient(seient) {
+  const base =
+    'relative flex h-8 w-8 shrink-0 items-center justify-center border text-[8px] font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+  if (seient.reservat) {
+    return `${base} cursor-not-allowed border-transparent bg-surface-container-low opacity-40`
+  }
+  if (seient.seleccionat_per_altre) {
+    return `${base} cursor-not-allowed border-amber-700/50 bg-amber-950/70 text-amber-200/80`
+  }
+  if (esSeientSeleccionat(seient)) {
+    return `${base} cursor-pointer border-primary bg-secondary-container text-white shadow-[0_0_15px_rgba(255,180,168,0.4)]`
+  }
+  const vip = seient.categoria === 'VIP'
+  return `${base} cursor-pointer border-outline-variant/20 bg-surface-container-highest text-white/90 hover:border-primary ${
+    vip ? 'ring-1 ring-inset ring-amber-500/25' : ''
+  }`
+}
+
+function onClickSeient(seient) {
+  if (seient.reservat || seient.seleccionat_per_altre) {
+    return
+  }
+  toggleSeient(seient)
+}
 </script>
 
 <template>
-  <div>
-    <main>
-      <div v-if="!peliId || !sessioId" class="missatge">
-        <p>Falta seleccionar pel·lícula o sessió.</p>
-        <NuxtLink to="/">Tornar a la cartellera</NuxtLink>
-      </div>
+  <div
+    class="min-h-screen overflow-x-hidden bg-surface-container-lowest font-body text-on-surface selection:bg-primary selection:text-on-primary-fixed"
+  >
+    <TicketFastNav />
 
-      <div v-else-if="peli">
-        <p class="tornar">
-          <NuxtLink :to="`/sala?peli=${peliId}`">← Tornar a les sessions</NuxtLink>
-        </p>
-        <h1>{{ peli.titol }}</h1>
+    <main
+      class="mx-auto grid max-w-[1920px] min-h-screen grid-cols-1 gap-12 px-4 pb-28 pt-32 lg:grid-cols-12 lg:gap-12 lg:px-8 lg:pb-20 xl:px-16"
+    >
+      <template v-if="!peliId || !sessioId">
+        <div class="col-span-full flex min-h-[50vh] flex-col items-center justify-center px-4 text-center">
+          <p class="font-body text-stone-400">
+            Falta seleccionar pel·lícula o sessió.
+          </p>
+          <NuxtLink
+            to="/"
+            class="font-headline mt-6 text-sm uppercase tracking-wider text-primary transition hover:text-red-400"
+          >
+            Tornar a la cartellera
+          </NuxtLink>
+        </div>
+      </template>
 
-        <div v-if="seatsLoading" class="missatge">Carregant seients...</div>
-
-        <div v-else-if="seients" class="sala-container">
-          <h2>Selecciona els teus seients</h2>
-
-          <div class="screen">PANTALLA</div>
-
-          <div class="seients">
+      <template v-else-if="peli">
+        <!-- Mapa de seients -->
+        <section class="flex flex-col items-center lg:col-span-8">
+          <div class="relative mb-16 w-full max-w-4xl">
+            <div class="h-1 w-full overflow-hidden rounded-full bg-primary/20">
+              <div class="h-full w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-60" />
+            </div>
             <div
-              v-for="seient in seients"
-              :key="seient.id"
-              class="seient"
-              :class="{
-                selected: selectedSeients.some(s => s.id === seient.id),
-                reservat: seient.reservat,
-                'other-selected': seient.seleccionat_per_altre
-              }"
-              :style="{ backgroundColor: seient.color }"
-              @click="!seient.reservat && !seient.seleccionat_per_altre && toggleSeient(seient)"
+              class="screen-curve mt-4 flex h-32 w-full items-center justify-center bg-gradient-to-b from-primary/10 to-transparent"
             >
-              {{ seient.fila }}{{ seient.numero }}
+              <h2
+                class="font-headline text-3xl uppercase tracking-[0.5em] text-primary-fixed opacity-80 md:text-5xl"
+              >
+                PANTALLA
+              </h2>
+            </div>
+            <div
+              class="pointer-events-none absolute left-1/2 top-0 h-64 w-[120%] -translate-x-1/2 bg-primary/5 blur-[100px]"
+            />
+          </div>
+
+          <div v-if="seatsLoading" class="py-16 font-headline text-sm uppercase tracking-[0.2em] text-stone-500">
+            Carregant seients…
+          </div>
+
+          <div v-else-if="seients" class="seat-grid flex w-full justify-center overflow-x-auto pb-12">
+            <div class="flex flex-col gap-6">
+              <div
+                v-for="bloc in filesPerMostrar"
+                :key="bloc.fila"
+                class="flex items-center gap-4"
+              >
+                <span
+                  class="w-8 shrink-0 font-label text-[10px] tracking-widest text-on-surface-variant"
+                >{{ bloc.fila }}</span>
+                <div class="flex flex-wrap items-center gap-3">
+                  <template v-for="(meitat, mi) in meitatsFila(bloc.seats)" :key="`${bloc.fila}-${mi}`">
+                    <div v-if="mi > 0" class="w-12 shrink-0" aria-hidden="true" />
+                    <button
+                      v-for="seient in meitat"
+                      :key="seient.id"
+                      type="button"
+                      :class="classeSeient(seient)"
+                      :disabled="seient.reservat || seient.seleccionat_per_altre || reservaEnCurs"
+                      :aria-label="`Fila ${seient.fila}, seient ${seient.numero}`"
+                      :aria-pressed="esSeientSeleccionat(seient)"
+                      @click="onClickSeient(seient)"
+                    >
+                      <span class="sr-only">{{ seient.fila }}{{ seient.numero }}</span>
+                      <span aria-hidden="true">{{ seient.numero }}</span>
+                    </button>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="legend">
-            <div class="legend-item"><span class="dot" style="background:#FFD700"></span> VIP (9,70€)</div>
-            <div class="legend-item"><span class="dot" style="background:#4169E1"></span> Normal (6,70€)</div>
-            <div class="legend-item"><span class="dot other-selected-dot"></span> Seleccionat per un altre</div>
+          <div v-if="seients && !seatsLoading" class="mt-8 flex flex-wrap justify-center gap-8 md:gap-12">
+            <div class="flex items-center gap-3">
+              <div class="h-5 w-5 border border-outline-variant/20 bg-surface-container-highest" />
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Disponible</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div
+                class="h-5 w-5 border border-primary bg-secondary-container shadow-[0_0_10px_rgba(255,180,168,0.3)]"
+              />
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Seleccionat</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="h-5 w-5 bg-surface-container-low opacity-40" />
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Ocupat</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="h-5 w-5 border border-amber-700/50 bg-amber-950/70" />
+              <span class="font-medium text-[10px] uppercase tracking-widest text-on-surface-variant">Altre usuari</span>
+            </div>
           </div>
+        </section>
 
-          <div v-if="selectedSeients.length > 0" class="resum">
-            <h3>Seients seleccionats:</h3>
-            <p>{{ selectedSeients.map(s => s.fila + s.numero).join(', ') }}</p>
-            <p class="total">Total: {{ totalPreu }}€</p>
-            <button class="comprar-btn" type="button" @click="anarAPagament">Comprar entrades</button>
+        <!-- Panell reserva -->
+        <aside class="h-fit lg:col-span-4 lg:sticky lg:top-32">
+          <div class="crimson-glass border-l border-primary/20 p-6 md:p-8">
+            <div class="mb-10 flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <h1 class="font-headline mb-2 text-3xl tracking-tight text-white md:text-4xl">
+                  {{ peli.titol }}
+                </h1>
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
+                  {{ formatSessioEtiqueta(sessioActual) || 'Sessió' }}
+                </p>
+              </div>
+              <div class="flex shrink-0 flex-col items-end">
+                <span
+                  class="material-symbols-outlined mb-1 text-primary"
+                  style="font-variation-settings: 'FILL' 1"
+                  aria-hidden="true"
+                >schedule</span>
+                <span class="font-mono text-lg font-black text-primary md:text-xl">
+                  {{ sessioActual?.data_hora ? new Date(sessioActual.data_hora).toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' }) : '—' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="mb-10 space-y-0">
+              <div class="flex items-center justify-between border-b border-white/10 py-4">
+                <span class="font-label text-xs uppercase tracking-widest text-stone-400">Butaques</span>
+                <span class="font-headline text-right text-lg text-white">{{ textButaquesSeleccionades }}</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-white/10 py-4">
+                <span class="font-label text-xs uppercase tracking-widest text-stone-400">Tarifa</span>
+                <span class="font-headline text-right text-lg text-white">{{ etiquetaTarifes }}</span>
+              </div>
+              <div class="flex items-center justify-between py-4">
+                <span class="font-label text-xs uppercase tracking-widest text-stone-400">Subtotal</span>
+                <span class="font-headline text-3xl text-primary">{{ totalPreu.toFixed(2) }}€</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+              <button
+                type="button"
+                class="w-full bg-on-surface py-5 font-black text-xs uppercase tracking-[0.3em] text-surface transition hover:bg-primary hover:text-on-primary-fixed active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="selectedSeients.length === 0 || reservaEnCurs"
+                @click="anarAPagament"
+              >
+                Confirmar reserva
+              </button>
+              <NuxtLink
+                :to="`/sala?peli=${peliId}`"
+                class="block w-full border border-white/20 py-5 text-center font-medium text-xs uppercase tracking-[0.3em] text-white transition hover:bg-white/5"
+              >
+                Canviar sessió
+              </NuxtLink>
+            </div>
+
+            <div class="mt-10 flex items-center gap-4 border border-white/5 bg-black/40 p-4">
+              <img
+                :src="peli.imatge_url"
+                :alt="peli.titol"
+                class="h-24 w-16 object-cover"
+              >
+              <div class="min-w-0">
+                <p class="mb-1 text-[9px] uppercase tracking-widest text-stone-500">
+                  Tornar enrere
+                </p>
+                <NuxtLink
+                  :to="`/sala?peli=${peliId}`"
+                  class="text-xs font-bold uppercase tracking-wider text-white transition hover:text-primary"
+                >
+                  Sessions d’aquesta pel·lícula
+                </NuxtLink>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </aside>
+      </template>
     </main>
+
+    <footer
+      class="flex w-full flex-col items-center justify-center gap-12 border-t-0 bg-stone-950 px-8 py-20"
+    >
+      <div class="font-headline text-2xl font-black tracking-[0.3em] text-red-600 md:text-3xl">
+        TICKET-FAST
+      </div>
+      <div class="flex flex-wrap justify-center gap-8 md:gap-10">
+        <NuxtLink
+          to="/"
+          class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
+        >
+          Cartelera
+        </NuxtLink>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+      </div>
+      <div class="h-px w-full max-w-4xl bg-gradient-to-r from-transparent via-stone-800 to-transparent" />
+      <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
+        © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.
+      </p>
+    </footer>
+
+    <div class="crimson-glass fixed bottom-0 left-0 z-50 grid w-full grid-cols-2 items-center p-4 md:hidden">
+      <NuxtLink
+        to="/"
+        class="flex flex-col items-center gap-1"
+        :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">movie</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+      </NuxtLink>
+      <NuxtLink
+        to="/mis-entrades"
+        class="flex flex-col items-center gap-1"
+        :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+      </NuxtLink>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.tornar {
-  margin-bottom: 16px;
-}
-
-.tornar a {
-  color: #007bff;
-  text-decoration: none;
-}
-
-.tornar a:hover {
-  text-decoration: underline;
-}
-
-.missatge {
-  padding: 24px;
-  text-align: center;
-}
-
-.sala-container {
-  margin-top: 30px;
-}
-
-.screen {
-  background: #333;
-  color: white;
-  text-align: center;
-  padding: 20px;
-  margin: 20px 0;
-  border-radius: 5px;
-}
-
-.seients {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 8px;
-  max-width: 500px;
-  margin: 0 auto;
-}
-
-.seient {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: white;
-  cursor: pointer;
-  border-radius: 4px;
-}
-
-.seient.reservat {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.seient.selected {
-  outline: 3px solid red;
-}
-
-.seient.other-selected {
-  background-color: #ffa500 !important; /* Taronja */
-  opacity: 0.8;
-  cursor: not-allowed;
-  border: 2px dashed #ff4500;
-}
-
-.other-selected-dot {
-  background-color: #ffa500;
-}
-
-.legend {
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-}
-
-.resum {
-  text-align: center;
-  margin-top: 30px;
-  padding: 20px;
-  background: #f9f9f9;
-}
-
-.total {
-  font-size: 24px;
-  font-weight: bold;
-}
-
-.comprar-btn {
-  background: #28a745;
-  color: white;
-  padding: 15px 30px;
-  border: none;
-  font-size: 18px;
-  cursor: pointer;
-  border-radius: 5px;
-}
-</style>

@@ -1,7 +1,7 @@
 <script setup>
 definePageMeta({
   middleware: 'guest',
-  layout: 'default'
+  layout: 'blank'
 })
 
 const authStore = useAuthStore()
@@ -35,59 +35,88 @@ async function enviar() {
 </script>
 
 <template>
-  <div class="wrap">
-    <h1>Iniciar sessió</h1>
-    <form class="form" @submit.prevent="enviar">
-      <label>
-        <span>Correu</span>
-        <input v-model="email" type="email" required autocomplete="email">
-      </label>
-      <label>
-        <span>Contrasenya</span>
-        <input v-model="password" type="password" required autocomplete="current-password">
-      </label>
-      <p v-if="errorMsg" class="err">{{ errorMsg }}</p>
-      <button type="submit" :disabled="pending">{{ pending ? 'Entrant…' : 'Entrar' }}</button>
-    </form>
-    <p class="link">
-      <NuxtLink to="/registre">Crear compte</NuxtLink>
-    </p>
+  <div
+    class="min-h-screen overflow-x-hidden bg-surface-container-lowest selection:bg-primary selection:text-on-primary-fixed"
+  >
+    <TicketFastNav />
+
+    <main
+      class="flex min-h-screen flex-col items-center justify-center px-4 pb-16 pt-28 md:px-8"
+    >
+      <div
+        class="w-full max-w-md border border-stone-800/80 bg-surface-container/80 p-8 shadow-[0_20px_50px_rgba(65,0,0,0.25)] backdrop-blur-sm md:p-10"
+      >
+        <h1
+          class="font-headline mb-2 text-center text-3xl font-bold uppercase tracking-tight text-white md:text-4xl"
+        >
+          Iniciar sessió
+        </h1>
+        <p class="mb-8 text-center font-body text-sm text-stone-500">
+          Accedeix amb el teu compte TICKET-FAST
+        </p>
+
+        <form class="space-y-6" @submit.prevent="enviar">
+          <label class="block">
+            <span
+              class="mb-2 block font-headline text-xs font-semibold uppercase tracking-widest text-stone-400"
+            >
+              Correu
+            </span>
+            <input
+              v-model="email"
+              type="email"
+              required
+              autocomplete="email"
+              class="w-full border border-stone-700 bg-stone-950/80 px-4 py-3 font-body text-white placeholder-stone-600 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="nom@exemple.com"
+            >
+          </label>
+          <label class="block">
+            <span
+              class="mb-2 block font-headline text-xs font-semibold uppercase tracking-widest text-stone-400"
+            >
+              Contrasenya
+            </span>
+            <input
+              v-model="password"
+              type="password"
+              required
+              autocomplete="current-password"
+              class="w-full border border-stone-700 bg-stone-950/80 px-4 py-3 font-body text-white placeholder-stone-600 transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="••••••••"
+            >
+          </label>
+
+          <p v-if="errorMsg" class="font-body text-sm text-red-400">
+            {{ errorMsg }}
+          </p>
+
+          <button
+            type="submit"
+            :disabled="pending"
+            class="font-headline w-full border border-white/10 bg-white py-4 text-sm font-bold uppercase tracking-[0.2em] text-black transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ pending ? 'Entrant…' : 'Entrar' }}
+          </button>
+        </form>
+
+        <p class="mt-8 text-center font-body text-sm text-stone-500">
+          No tens compte?
+          <NuxtLink
+            to="/registre"
+            class="font-semibold text-primary transition hover:text-red-400"
+          >
+            Crear compte
+          </NuxtLink>
+        </p>
+      </div>
+
+      <NuxtLink
+        to="/"
+        class="font-headline mt-10 text-sm uppercase tracking-wider text-stone-500 transition hover:text-white"
+      >
+        ← Tornar a la cartelera
+      </NuxtLink>
+    </main>
   </div>
 </template>
-
-<style scoped>
-.wrap {
-  max-width: 400px;
-  margin: 40px auto;
-  padding: 24px;
-}
-
-.form label {
-  display: block;
-  margin-bottom: 16px;
-}
-
-.form label span {
-  display: block;
-  margin-bottom: 6px;
-}
-
-.form input {
-  width: 100%;
-  padding: 10px;
-  box-sizing: border-box;
-}
-
-.err {
-  color: #c00;
-}
-
-button {
-  padding: 12px 24px;
-  cursor: pointer;
-}
-
-.link {
-  margin-top: 20px;
-}
-</style>

@@ -21,19 +21,31 @@ const seientsParam = primerQuery(route.query.seients)
 
 const seientIds = computed(() => {
   if (!seientsParam || typeof seientsParam !== 'string') return []
-  return seientsParam.split(',').map(id => parseInt(id, 10)).filter(n => !Number.isNaN(n))
+  return seientsParam.split(',').map((id) => parseInt(id, 10)).filter((n) => !Number.isNaN(n))
 })
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
+const { data: sessionsList } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
+  baseURL,
+  immediate: !!peliId
+})
 const { data: totsSeients } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
   immediate: !!sessioId
 })
 
+const sessioActual = computed(() => {
+  const list = sessionsList.value
+  if (!list || !Array.isArray(list) || !sessioId) {
+    return null
+  }
+  return list.find((s) => Number(s.id) === Number(sessioId)) ?? null
+})
+
 const seleccionats = computed(() => {
   if (!totsSeients.value || !seientIds.value.length) return []
   const set = new Set(seientIds.value)
-  return totsSeients.value.filter(s => set.has(s.id))
+  return totsSeients.value.filter((s) => set.has(s.id))
 })
 
 function getPreu(categoria) {
@@ -45,6 +57,29 @@ const totalPreu = computed(() => {
   return seleccionats.value.reduce((sum, s) => sum + getPreu(s.categoria), 0)
 })
 
+/** Sense càrrecs addicionals en aquesta demo; coincideix amb el que registra la compra al servidor. */
+const cargosServei = computed(() => 0)
+const totalAmbCargos = computed(() => totalPreu.value)
+
+function formatEuro(n) {
+  return (
+    n.toLocaleString('ca-ES', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }) + ' €'
+  )
+}
+
+function formatDataHoraCompleta(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return (
+    d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+    + ' — '
+    + d.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit' })
+  )
+}
+
 const form = reactive({
   email: '',
   nom: '',
@@ -53,7 +88,45 @@ const form = reactive({
   cvv: ''
 })
 
+watch(
+  () => authStore.user,
+  (u) => {
+    if (u && !form.nom && u.nom) {
+      form.nom = u.nom
+    }
+    if (u && !form.email && u.email) {
+      form.email = u.email
+    }
+  },
+  { immediate: true }
+)
+
 const enviant = ref(false)
+
+/** Mateix marge que reserva temporal al servidor (10 min). */
+const segonsRestants = ref(600)
+let intervalId
+
+onMounted(() => {
+  intervalId = setInterval(() => {
+    if (segonsRestants.value > 0) {
+      segonsRestants.value -= 1
+    }
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (intervalId) {
+    clearInterval(intervalId)
+  }
+})
+
+const tempsRestantFormat = computed(() => {
+  const t = segonsRestants.value
+  const m = Math.floor(t / 60)
+  const s = t % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+})
 
 function formatTargeta(v) {
   const digits = v.replace(/\D/g, '').slice(0, 16)
@@ -90,7 +163,7 @@ async function enviarCompra() {
       sessioId: sessioNum,
       seientIds: seientIds.value
     }
-    var urlComprar = gatewayURL + '/api/comprar'
+    const urlComprar = gatewayURL + '/api/comprar'
     await $fetch(urlComprar, {
       method: 'POST',
       body: cos,
@@ -103,7 +176,7 @@ async function enviarCompra() {
       alert('La sessió ha caducat, cal tornar a entrar')
       navigateTo('/login')
     } else {
-      var msg = 'Error en desar la compra'
+      let msg = 'Error en desar la compra'
       if (e && e.data) {
         if (e.data.missatge) {
           msg = e.data.missatge
@@ -124,234 +197,288 @@ const butaquesUrl = computed(() => `/butaques?peli=${peliId}&sessio=${sessioId}`
 </script>
 
 <template>
-  <div class="pago-page">
-    <main class="pago-main">
-      <p class="tornar">
-        <NuxtLink :to="butaquesUrl">← Tornar a les butaques</NuxtLink>
-      </p>
+  <div
+    class="min-h-screen overflow-x-hidden bg-black font-body text-on-surface selection:bg-primary selection:text-on-primary-fixed"
+  >
+    <TicketFastNav />
 
-      <div v-if="!peliId || !sessioId || !seientIds.length" class="missatge">
-        <p>No hi ha cap selecció de seients. Torna a triar butaques.</p>
-        <NuxtLink v-if="peliId && sessioId" :to="butaquesUrl">Anar a butaques</NuxtLink>
-        <NuxtLink v-else to="/">Cartellera</NuxtLink>
-      </div>
-
-      <template v-else-if="peli && seleccionats.length">
-        <h1>Pagament</h1>
-        <p class="subtitol">{{ peli.titol }}</p>
-
-        <section class="resum">
-          <h2>Resum de la comanda</h2>
-          <ul>
-            <li v-for="s in seleccionats" :key="s.id">
-              Seient {{ s.fila }}{{ s.numero }} — {{ s.categoria }} ({{ getPreu(s.categoria) }}€)
-            </li>
-          </ul>
-          <p class="total-line">Total: <strong>{{ totalPreu }}€</strong></p>
-        </section>
-
-        <form class="form-pago" novalidate @submit.prevent="enviarCompra">
-          <h2>Dades de contacte</h2>
-          <p class="hint">Tots els camps són opcionals per poder fer proves.</p>
-          <label>
-            <span>Correu electrònic</span>
-            <input v-model="form.email" type="text" autocomplete="email" placeholder="nom@exemple.com">
-          </label>
-          <label>
-            <span>Nom complet</span>
-            <input v-model="form.nom" type="text" autocomplete="name" placeholder="Nom i cognoms">
-          </label>
-
-          <h2>Dades de la targeta</h2>
-          <p class="hint">Demostració — no es guarda cap dada real.</p>
-          <label>
-            <span>Número de targeta</span>
-            <input
-              v-model="form.numeroTargeta"
-              type="text"
-              inputmode="numeric"
-              autocomplete="cc-number"
-              maxlength="19"
-              placeholder="0000 0000 0000 0000"
-            >
-          </label>
-          <div class="fila-doble">
-            <label>
-              <span>Caducitat</span>
-              <input
-                v-model="form.caducitat"
-                type="text"
-                inputmode="numeric"
-                autocomplete="cc-exp"
-                maxlength="5"
-                placeholder="MM/AA"
-              >
-            </label>
-            <label>
-              <span>CVV</span>
-              <input
-                v-model="form.cvv"
-                type="password"
-                inputmode="numeric"
-                autocomplete="cc-csc"
-                maxlength="4"
-                placeholder="123"
-              >
-            </label>
-          </div>
-
-          <button type="submit" class="btn-pagar" :disabled="enviant">
-            {{ enviant ? 'Processant…' : `Pagar ${totalPreu}€` }}
-          </button>
-        </form>
+    <main
+      class="mx-auto max-w-[1920px] pb-28 pt-28 lg:grid lg:min-h-[calc(100svh-7rem)] lg:grid-cols-12 lg:gap-0 lg:pb-0 lg:pt-32"
+    >
+      <template v-if="!peliId || !sessioId || !seientIds.length">
+        <div
+          class="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center lg:col-span-12"
+        >
+          <p class="text-stone-400">
+            No hi ha cap selecció de seients. Torna a triar butaques.
+          </p>
+          <NuxtLink
+            v-if="peliId && sessioId"
+            :to="butaquesUrl"
+            class="font-headline mt-6 text-sm uppercase tracking-wider text-primary transition hover:text-red-400"
+          >
+            Anar a butaques
+          </NuxtLink>
+          <NuxtLink
+            v-else
+            to="/"
+            class="font-headline mt-6 text-sm uppercase tracking-wider text-primary transition hover:text-red-400"
+          >
+            Cartellera
+          </NuxtLink>
+        </div>
       </template>
 
-      <div v-else-if="peliId && sessioId" class="missatge">
-        <p>Carregant o seients no vàlids…</p>
+      <template v-else-if="peli && seleccionats.length">
+        <!-- Columna formulari -->
+        <section
+          class="flex flex-col px-6 pb-16 pt-8 lg:col-span-7 lg:px-12 lg:pb-24 lg:pt-4 xl:px-20"
+        >
+          <NuxtLink
+            :to="butaquesUrl"
+            class="font-headline mb-10 inline-flex text-xs uppercase tracking-[0.2em] text-stone-500 transition hover:text-white"
+          >
+            ← Tornar a les butaques
+          </NuxtLink>
+
+          <div class="mb-4 flex items-center gap-3">
+            <span class="h-px w-8 bg-primary" aria-hidden="true" />
+            <span class="font-label text-[10px] font-bold uppercase tracking-[0.35em] text-primary">
+              Finalitzar compra
+            </span>
+          </div>
+
+          <h1 class="font-headline mb-10 text-4xl font-bold tracking-tight text-white md:text-5xl">
+            Detalls del pagament
+          </h1>
+
+          <!-- Compte enrere -->
+          <div
+            class="mb-12 flex items-center gap-4 border-l-4 border-primary bg-stone-900/60 px-5 py-4"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="material-symbols-outlined shrink-0 text-3xl text-primary" aria-hidden="true">timer</span>
+            <div>
+              <p class="font-label text-[10px] uppercase tracking-[0.25em] text-stone-500">
+                Temps restant
+              </p>
+              <p class="font-mono text-3xl font-black text-primary md:text-4xl">
+                {{ tempsRestantFormat }}
+              </p>
+            </div>
+          </div>
+
+          <form class="max-w-xl space-y-10" novalidate @submit.prevent="enviarCompra">
+            <div>
+              <label class="block">
+                <span class="font-label text-[10px] uppercase tracking-[0.2em] text-stone-500">Nom complet</span>
+                <input
+                  v-model="form.nom"
+                  type="text"
+                  autocomplete="name"
+                  placeholder="Nom i cognoms"
+                  class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-3 text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+                >
+              </label>
+            </div>
+
+            <div>
+              <label class="block">
+                <span class="font-label text-[10px] uppercase tracking-[0.2em] text-stone-500">Correu electrònic</span>
+                <input
+                  v-model="form.email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="nom@exemple.com"
+                  class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-3 text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+                >
+              </label>
+            </div>
+
+            <div>
+              <p class="font-label mb-4 text-[10px] uppercase tracking-[0.2em] text-stone-500">
+                Targeta de crèdit
+              </p>
+              <p class="mb-6 font-body text-xs text-stone-600">
+                Demostració — no es desa cap dada real.
+              </p>
+              <div class="grid grid-cols-1 gap-8 md:grid-cols-12 md:gap-6">
+                <label class="md:col-span-7">
+                  <span class="sr-only">Número de targeta</span>
+                  <input
+                    v-model="form.numeroTargeta"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="cc-number"
+                    maxlength="19"
+                    placeholder="0000 0000 0000 0000"
+                    class="w-full border-0 border-b border-stone-600 bg-transparent py-3 font-mono text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+                  >
+                </label>
+                <label class="md:col-span-3">
+                  <span class="font-label text-[10px] uppercase tracking-[0.2em] text-stone-500">Caduca</span>
+                  <input
+                    v-model="form.caducitat"
+                    type="text"
+                    inputmode="numeric"
+                    autocomplete="cc-exp"
+                    maxlength="5"
+                    placeholder="MM/AA"
+                    class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-3 font-mono text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+                  >
+                </label>
+                <label class="md:col-span-2">
+                  <span class="font-label text-[10px] uppercase tracking-[0.2em] text-stone-500">CVC</span>
+                  <input
+                    v-model="form.cvv"
+                    type="password"
+                    inputmode="numeric"
+                    autocomplete="cc-csc"
+                    maxlength="4"
+                    placeholder="000"
+                    class="mt-2 w-full border-0 border-b border-stone-600 bg-transparent py-3 font-mono text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-0"
+                  >
+                </label>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              class="w-full bg-white py-5 font-black text-xs uppercase tracking-[0.35em] text-black transition hover:bg-primary hover:text-on-primary-fixed active:scale-[0.99] disabled:cursor-wait disabled:opacity-60"
+              :disabled="enviant"
+            >
+              {{ enviant ? 'Processant…' : 'Pagar ara' }}
+            </button>
+          </form>
+        </section>
+
+        <!-- Columna resum -->
+        <aside
+          class="relative flex min-h-[min(100%,560px)] flex-col justify-between overflow-hidden lg:col-span-5 lg:min-h-[calc(100svh-8rem)]"
+        >
+          <img
+            :src="peli.imatge_url"
+            :alt="peli.titol"
+            class="absolute inset-0 h-full w-full object-cover"
+          >
+          <div class="absolute inset-0 bg-gradient-to-t from-black via-black/75 to-black/35" />
+          <div class="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+
+          <div class="relative z-10 flex flex-1 flex-col justify-between p-8 lg:p-12">
+            <div>
+              <h2
+                class="font-headline text-3xl font-bold uppercase leading-tight tracking-tight text-white drop-shadow-lg md:text-4xl lg:text-5xl"
+              >
+                {{ peli.titol }}
+              </h2>
+              <p
+                v-if="sessioActual?.sala_nom"
+                class="mt-3 font-label text-xs font-bold uppercase tracking-[0.2em] text-primary"
+              >
+                {{ sessioActual.sala_nom }}
+              </p>
+
+              <div
+                class="mt-10 flex items-start justify-between gap-4 border-b border-white/10 pb-6"
+              >
+                <div>
+                  <p class="font-label text-[9px] uppercase tracking-[0.25em] text-stone-500">
+                    Data i hora
+                  </p>
+                  <p class="mt-2 font-body text-sm font-medium text-white">
+                    {{ formatDataHoraCompleta(sessioActual?.data_hora) }}
+                  </p>
+                </div>
+                <span class="material-symbols-outlined text-2xl text-primary/90" aria-hidden="true">calendar_month</span>
+              </div>
+
+              <div class="mt-8 flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p class="font-label text-[9px] uppercase tracking-[0.25em] text-stone-500">
+                    Seients seleccionats
+                  </p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    <span
+                      v-for="s in seleccionats"
+                      :key="s.id"
+                      class="inline-flex border border-primary bg-secondary-container px-3 py-1.5 font-headline text-sm font-bold uppercase tracking-wide text-primary-fixed shadow-[0_0_12px_rgba(255,180,168,0.25)]"
+                    >
+                      {{ s.fila }}{{ s.numero }}
+                    </span>
+                  </div>
+                </div>
+                <span class="material-symbols-outlined text-2xl text-primary/90" aria-hidden="true">event_seat</span>
+              </div>
+            </div>
+
+            <div
+              class="mt-12 border border-white/10 bg-black/55 p-6 backdrop-blur-md lg:mt-auto"
+            >
+              <div class="flex justify-between border-b border-white/10 py-3 font-label text-xs uppercase tracking-widest text-stone-400">
+                <span>Subtotal ({{ seleccionats.length }} entrades)</span>
+                <span class="font-body text-white">{{ formatEuro(totalPreu) }}</span>
+              </div>
+              <div class="flex justify-between py-3 font-label text-xs uppercase tracking-widest text-stone-400">
+                <span>Càrrecs de servei</span>
+                <span class="font-body text-white">{{ formatEuro(cargosServei) }}</span>
+              </div>
+              <div class="mt-4 flex items-end justify-between pt-2">
+                <span class="font-headline text-lg text-white">Total</span>
+                <span class="font-headline text-3xl font-bold text-primary md:text-4xl">{{ formatEuro(totalAmbCargos) }}</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </template>
+
+      <div
+        v-else-if="peliId && sessioId"
+        class="flex min-h-[40vh] items-center justify-center px-6 text-stone-500 lg:col-span-12"
+      >
+        Carregant o seients no vàlids…
       </div>
     </main>
+
+    <footer
+      class="mt-auto flex w-full flex-col items-center justify-center gap-12 border-t-0 bg-stone-950 px-8 py-16 lg:py-20"
+    >
+      <div class="font-headline text-2xl font-black tracking-[0.3em] text-red-600 md:text-3xl">
+        TICKET-FAST
+      </div>
+      <div class="flex flex-wrap justify-center gap-8 md:gap-10">
+        <NuxtLink
+          to="/"
+          class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
+        >
+          Cartelera
+        </NuxtLink>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+      </div>
+      <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
+        © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.
+      </p>
+    </footer>
+
+    <div class="crimson-glass fixed bottom-0 left-0 z-50 grid w-full grid-cols-2 items-center p-4 md:hidden">
+      <NuxtLink
+        to="/"
+        class="flex flex-col items-center gap-1"
+        :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">movie</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+      </NuxtLink>
+      <NuxtLink
+        to="/mis-entrades"
+        class="flex flex-col items-center gap-1"
+        :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
+      >
+        <span class="material-symbols-outlined">confirmation_number</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+      </NuxtLink>
+    </div>
   </div>
 </template>
-
-<style scoped>
-.pago-page {
-  min-height: 100vh;
-  padding: 24px 16px 48px;
-  background: #f5f5f5;
-}
-
-.pago-main {
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.tornar {
-  margin-bottom: 20px;
-}
-
-.tornar a {
-  color: #007bff;
-  text-decoration: none;
-}
-
-.tornar a:hover {
-  text-decoration: underline;
-}
-
-h1 {
-  font-size: 1.75rem;
-  margin: 0 0 8px;
-}
-
-.subtitol {
-  color: #555;
-  margin: 0 0 24px;
-}
-
-.missatge {
-  padding: 24px;
-  text-align: center;
-  background: white;
-  border-radius: 8px;
-}
-
-.resum {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.resum h2 {
-  font-size: 1.1rem;
-  margin: 0 0 12px;
-}
-
-.resum ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-.total-line {
-  margin: 16px 0 0;
-  font-size: 1.2rem;
-}
-
-.form-pago {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.form-pago h2 {
-  font-size: 1.1rem;
-  margin: 24px 0 16px;
-}
-
-.form-pago h2:first-child {
-  margin-top: 0;
-}
-
-.hint {
-  font-size: 0.85rem;
-  color: #666;
-  margin: -8px 0 16px;
-}
-
-label {
-  display: block;
-  margin-bottom: 16px;
-}
-
-label span {
-  display: block;
-  font-size: 0.9rem;
-  margin-bottom: 6px;
-  color: #333;
-}
-
-input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  font-size: 1rem;
-  box-sizing: border-box;
-}
-
-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
-}
-
-.fila-doble {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.btn-pagar {
-  width: 100%;
-  margin-top: 24px;
-  padding: 16px;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: white;
-  background: #28a745;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.btn-pagar:hover:not(:disabled) {
-  background: #218838;
-}
-
-.btn-pagar:disabled {
-  opacity: 0.7;
-  cursor: wait;
-}
-</style>
