@@ -1,8 +1,12 @@
 <?php
 
 use App\Services\AforoService;
+use App\Support\SeientTemporalEstat;
+use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\PersonalAccessToken;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompraController;
 use App\Http\Controllers\EntradaController;
@@ -78,10 +82,20 @@ Route::get('/peliculas/{id}/sesiones', function ($id) {
     });
 });
 
-Route::get('/sesiones/{id}/asientos', function ($id) {
+Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
     $sessio = Sessio::find($id);
     if (! $sessio) {
         return [];
+    }
+
+    $authUserId = null;
+    $bearer = $request->bearerToken();
+    if ($bearer) {
+        $accessToken = PersonalAccessToken::findToken($bearer);
+        $tokenable = $accessToken?->tokenable;
+        if ($tokenable instanceof User) {
+            $authUserId = (string) $tokenable->getAuthIdentifier();
+        }
     }
 
     $seients = Seient::where('sala_id', $sessio->sala_id)
@@ -98,9 +112,10 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
         ->where('expires_at', '>', now())
         ->get();
 
-    return $seients->map(function ($s) use ($venuts, $reserves) {
+    return $seients->map(function ($s) use ($venuts, $reserves, $authUserId) {
         $isVenut = in_array($s->id, $venuts);
         $reserva = $reserves->firstWhere('seient_id', $s->id);
+        $temporal = SeientTemporalEstat::flags($isVenut, $reserva, $authUserId);
 
         return [
             'id' => $s->id,
@@ -109,8 +124,8 @@ Route::get('/sesiones/{id}/asientos', function ($id) {
             'categoria' => $s->categoria->nom,
             'color' => $s->categoria->color_hex,
             'reservat' => $isVenut,
-            'seleccionat_per_altre' => ! $isVenut && $reserva !== null,
-            'usuari_reserva' => $reserva ? $reserva->usuari_id : null
+            'seleccionat_per_altre' => $temporal['seleccionat_per_altre'],
+            'la_meva_reserva' => $temporal['la_meva_reserva'],
         ];
     });
 });

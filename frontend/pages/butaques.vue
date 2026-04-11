@@ -17,48 +17,101 @@ function mateixaSessio(id) {
   return id != null && Number(id) === Number(sessioId)
 }
 
+const MAX_PENDING_SOCKET_EVENTS = 64
+/** Esdeveniments rebuts abans que `useFetch` acabi (o amb dades readonly): es processen després. */
+const pendingSeatSocketEvents = ref([])
+
 function patchSeient(seientId, patch) {
   const list = seients.value
-  if (!list) return
-  const i = list.findIndex((s) => s.id === seientId)
+  if (!list || !list.length) return
+  const id = Number(seientId)
+  const i = list.findIndex((s) => Number(s.id) === id)
   if (i === -1) return
-  list[i] = { ...list[i], ...patch }
+  // Reassignació nova array: el `data` de useFetch sovint és readonly; mutar list[i] no redibuixa.
+  seients.value = list.map((s, idx) => (idx === i ? { ...s, ...patch } : s))
+}
+
+function enqueueSeatSocketEvent(kind, data) {
+  if (pendingSeatSocketEvents.value.length < MAX_PENDING_SOCKET_EVENTS) {
+    pendingSeatSocketEvents.value.push({ kind, data })
+  }
+}
+
+function flushPendingSeatSocketEvents() {
+  if (!seients.value || seatsLoading.value || pendingSeatSocketEvents.value.length === 0) {
+    return
+  }
+  const batch = pendingSeatSocketEvents.value.splice(0)
+  for (const ev of batch) {
+    if (ev.kind === 'seleccionat') {
+      processSeientSeleccionat(ev.data)
+    } else if (ev.kind === 'alliberat') {
+      processSeientAlliberat(ev.data)
+    } else if (ev.kind === 'compra') {
+      processCompraCreada(ev.data)
+    }
+  }
 }
 
 const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
 const { data: seients, pending: seatsLoading, refresh: refreshSeats } = await useFetch(sessioId ? `/sesiones/${sessioId}/asientos` : null, {
   baseURL,
-  immediate: !!sessioId
+  immediate: !!sessioId,
+  headers: computed(() => authStore.capcalarsAutenticacio())
 })
 
 const selectedSeients = ref([])
 const reservaEnCurs = ref(false)
 
-function onSeientSeleccionat(data) {
-  if (!mateixaSessio(data.sessio_id) || !seients.value) return
+function processSeientSeleccionat(data) {
+  if (!mateixaSessio(data.sessio_id)) return
   const jo = authStore.currentUserId ? String(authStore.currentUserId) : null
   const actor = data.usuari_id != null ? String(data.usuari_id) : ''
   if (jo && actor === jo) {
     return
   }
-  if (!jo && selectedSeients.value.some((s) => s.id === data.seient_id)) {
+  if (!jo && selectedSeients.value.some((s) => Number(s.id) === Number(data.seient_id))) {
     return
   }
   patchSeient(data.seient_id, { seleccionat_per_altre: true })
 }
 
-function onSeientAlliberat(data) {
-  if (!mateixaSessio(data.sessio_id) || !seients.value) return
+function onSeientSeleccionat(data) {
+  if (seatsLoading.value || !seients.value) {
+    enqueueSeatSocketEvent('seleccionat', data)
+    return
+  }
+  processSeientSeleccionat(data)
+}
+
+function processSeientAlliberat(data) {
+  if (!mateixaSessio(data.sessio_id)) return
   patchSeient(data.seient_id, { seleccionat_per_altre: false })
 }
 
-function onCompraCreada(data) {
-  if (!mateixaSessio(data.sessio_id) || !data.seient_ids || !seients.value) return
+function onSeientAlliberat(data) {
+  if (seatsLoading.value || !seients.value) {
+    enqueueSeatSocketEvent('alliberat', data)
+    return
+  }
+  processSeientAlliberat(data)
+}
+
+function processCompraCreada(data) {
+  if (!mateixaSessio(data.sessio_id) || !data.seient_ids) return
   const ids = new Set(data.seient_ids.map((id) => Number(id)))
   for (const id of ids) {
     patchSeient(id, { reservat: true, seleccionat_per_altre: false })
   }
   selectedSeients.value = selectedSeients.value.filter((s) => !ids.has(s.id))
+}
+
+function onCompraCreada(data) {
+  if (seatsLoading.value || !seients.value) {
+    enqueueSeatSocketEvent('compra', data)
+    return
+  }
+  processCompraCreada(data)
 }
 
 function rejoinSalaAlConnectar() {
@@ -104,18 +157,18 @@ onBeforeRouteLeave(async (to) => {
 onMounted(async () => {
   await authStore.syncUsuariSiCal(baseURL)
 
-  if (sessioId) {
-    joinSessio(sessioId)
-  }
-
   const socket = ensureSocket()
   if (!socket) return
 
+  // Listeners abans de unir-se a la sala: evita perdre esdeveniments ràpids en el primer connect.
   socket.on('connect', rejoinSalaAlConnectar)
-
   socket.on('seient-seleccionat', onSeientSeleccionat)
   socket.on('seient-alliberat', onSeientAlliberat)
   socket.on('compra-creada', onCompraCreada)
+
+  if (sessioId) {
+    joinSessio(sessioId)
+  }
 })
 
 onUnmounted(() => {
@@ -193,6 +246,26 @@ watch(
     selectedSeients.value = []
   }
 )
+
+/** Restaura la selecció des de la resposta inicial (la_meva_reserva) després de recarregar. */
+watch(
+  () => seients.value,
+  (list) => {
+    if (!list || !Array.isArray(list) || selectedSeients.value.length > 0) {
+      return
+    }
+    const mine = list.filter((s) => s.la_meva_reserva)
+    if (mine.length) {
+      selectedSeients.value = mine.slice()
+    }
+  },
+  { immediate: true }
+)
+
+/** Quan arriben els seients des de l’API, aplica esdeveniments Socket en cua. */
+watch([seients, seatsLoading], () => {
+  flushPendingSeatSocketEvents()
+})
 </script>
 
 <template>
