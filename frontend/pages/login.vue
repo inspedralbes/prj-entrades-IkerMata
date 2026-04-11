@@ -87,7 +87,7 @@ async function enviar() {
             >
           </label>
 
-          <p v-if="errorMsg" class="font-body text-sm text-red-400">
+          <p v-if="errorMsg" data-cy="login-error" class="font-body text-sm text-red-400">
             {{ errorMsg }}
           </p>
 

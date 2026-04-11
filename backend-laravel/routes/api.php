@@ -169,8 +169,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/usuari', [AuthController::class, 'usuari']);
     Route::get('/entrades', [EntradaController::class, 'indexAutenticat']);
     Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
-    Route::post('/comprar', [CompraController::class, 'desar']);
-    Route::post('/reservar', [CompraController::class, 'reservarTemporal']);
+    Route::post('/comprar', [CompraController::class, 'desar'])->middleware('throttle:comprar');
+    Route::post('/reservar', [CompraController::class, 'reservarTemporal'])->middleware('throttle:reservar');
 
     Route::get('/admin/panell-temps-real', [AdminInformesController::class, 'panellTempsReal']);
     Route::get('/admin/informes-resum', [AdminInformesController::class, 'informesResum']);
