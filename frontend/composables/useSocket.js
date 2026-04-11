@@ -52,12 +52,23 @@ export function useSocket() {
     return () => {}
   }
 
+  /** Cartellera / admin: canvis a pel·lícules o sessions (Redis → gateway → tots els clients). */
+  function onCatalogActualitzat(callback) {
+    const s = ensureSocket()
+    if (s) {
+      s.on('catalog-actualitzat', callback)
+      return () => s.off('catalog-actualitzat', callback)
+    }
+    return () => {}
+  }
+
   return {
     socket,
     ensureSocket,
     joinSessio,
     joinPelicula,
     onAforoActualitzat,
-    onCompraCreada
+    onCompraCreada,
+    onCatalogActualitzat
   }
 }

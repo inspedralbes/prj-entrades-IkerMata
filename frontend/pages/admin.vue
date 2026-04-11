@@ -6,10 +6,13 @@ definePageMeta({
 const baseURL = useApiBase()
 const authStore = useAuthStore()
 const router = useRouter()
+const { onCatalogActualitzat } = useSocket()
 
 const { data: pelis, refresh: refreshPelis } = await useFetch('/peliculas', { baseURL })
 
 const sales = ref([])
+
+let offCatalogActualitzat = () => {}
 
 onMounted(async () => {
   await authStore.syncUsuariSiCal(baseURL)
@@ -24,6 +27,20 @@ onMounted(async () => {
   } catch (_) {
     sales.value = []
   }
+
+  offCatalogActualitzat = onCatalogActualitzat(async (data) => {
+    await refreshPelis()
+    if (data?.scope === 'peliculas' && peliSessioId.value) {
+      await carregarSessions()
+    }
+    if (data?.scope === 'sesiones' && String(data.pelicula_id) === String(peliSessioId.value)) {
+      await carregarSessions()
+    }
+  })
+})
+
+onUnmounted(() => {
+  offCatalogActualitzat()
 })
 
 const peliSessioId = ref('')

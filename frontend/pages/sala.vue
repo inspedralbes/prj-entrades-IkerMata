@@ -5,12 +5,12 @@ definePageMeta({
 
 const route = useRoute()
 const baseURL = useApiBase()
-const { joinPelicula, joinSessio, onAforoActualitzat, ensureSocket } = useSocket()
+const { joinPelicula, joinSessio, onAforoActualitzat, onCatalogActualitzat, ensureSocket } = useSocket()
 
 const peliId = route.query.peli
 
-const { data: peli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
-const { data: sessionsData } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
+const { data: peli, refresh: refreshPeli } = await useFetch(peliId ? `/peliculas/${peliId}` : null, { baseURL, immediate: !!peliId })
+const { data: sessionsData, refresh: refreshSessions } = await useFetch(peliId ? `/peliculas/${peliId}/sesiones` : null, {
   baseURL,
   immediate: !!peliId
 })
@@ -31,6 +31,7 @@ watch(
 )
 
 let offAforoActualitzat = () => {}
+let offCatalogActualitzat = () => {}
 let offSocketConnect = () => {}
 
 function joinAllSocketRooms() {
@@ -58,6 +59,22 @@ onMounted(() => {
     )
   })
 
+  offCatalogActualitzat = onCatalogActualitzat(async (data) => {
+    if (!peliId) return
+    if (data.scope === 'peliculas') {
+      await refreshPeli()
+      await refreshSessions()
+      await nextTick()
+      joinAllSocketRooms()
+      return
+    }
+    if (data.scope === 'sesiones' && Number(data.pelicula_id) === Number(peliId)) {
+      await refreshSessions()
+      await nextTick()
+      joinAllSocketRooms()
+    }
+  })
+
   const socket = ensureSocket()
   if (socket) {
     socket.on('connect', joinAllSocketRooms)
@@ -68,6 +85,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   offAforoActualitzat()
+  offCatalogActualitzat()
   offSocketConnect()
 })
 
