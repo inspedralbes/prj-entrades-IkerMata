@@ -390,7 +390,7 @@ function sessioSlotClass(disponible) {
                         v-else
                         class="font-headline mt-1 text-[9px] font-bold uppercase tracking-wider text-stone-600"
                       >
-                        Completa
+                        Esgotada
                       </span>
                     </button>
                   </div>
@@ -422,7 +422,7 @@ function sessioSlotClass(disponible) {
         :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartellera</span>
       </NuxtLink>
       <NuxtLink
         to="/mis-entrades"
@@ -430,7 +430,7 @@ function sessioSlotClass(disponible) {
         :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Les meves entrades</span>
       </NuxtLink>
     </div>
   </div>

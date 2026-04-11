@@ -137,7 +137,7 @@ async function desarSessio() {
 
 async function esborrarSessio(id) {
   if (esborrantSessio.value) return
-  if (!confirm('Eliminar aquesta sessió?')) return
+  if (!confirm('Vols esborrar aquesta sessió?')) return
   esborrantSessio.value = true
   try {
     await $fetch(`${toValue(baseURL)}/sesiones/${id}`, {
@@ -373,7 +373,7 @@ function retallDescripcio(t) {
         class="mb-10 border border-stone-800 bg-surface-container/90 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.35)] md:p-8"
       >
         <h2 class="font-headline mb-6 text-xl font-bold uppercase text-white">
-          {{ editantId ? 'Editar' : 'Nova' }} pel·lícula
+          {{ editantId ? 'Edita' : 'Nova' }} pel·lícula
         </h2>
         <div class="grid gap-6 md:grid-cols-2">
           <label class="block md:col-span-2">
@@ -464,7 +464,7 @@ function retallDescripcio(t) {
                   :disabled="guardantPeli || esborrant"
                   @click="editarPeli(p)"
                 >
-                  Editar
+                  Edita
                 </button>
                 <button
                   type="button"
@@ -472,7 +472,7 @@ function retallDescripcio(t) {
                   :disabled="guardantPeli || esborrant"
                   @click="esborrarPeli(p.id)"
                 >
-                  {{ esborrant ? '…' : 'Esborrar' }}
+                  {{ esborrant ? '…' : 'Esborra' }}
                 </button>
               </td>
             </tr>
@@ -687,7 +687,7 @@ function retallDescripcio(t) {
             class="mt-8 border border-stone-800 bg-surface-container/90 p-6 md:p-8"
           >
             <h3 class="font-headline mb-6 text-lg font-bold uppercase text-white">
-              {{ editantSessioId ? 'Editar sessió' : 'Nova sessió' }}
+              {{ editantSessioId ? 'Edita la sessió' : 'Nova sessió' }}
             </h3>
             <div class="grid gap-6 md:max-w-xl">
               <label class="block">
@@ -763,7 +763,7 @@ function retallDescripcio(t) {
                       :disabled="guardantSessio || esborrantSessio"
                       @click="editarSessio(s)"
                     >
-                      Editar
+                      Edita
                     </button>
                     <button
                       type="button"
@@ -771,7 +771,7 @@ function retallDescripcio(t) {
                       :disabled="guardantSessio || esborrantSessio"
                       @click="esborrarSessio(s.id)"
                     >
-                      {{ esborrantSessio ? '…' : 'Esborrar' }}
+                      {{ esborrantSessio ? '…' : 'Esborra' }}
                     </button>
                   </td>
                 </tr>
@@ -799,11 +799,11 @@ function retallDescripcio(t) {
           to="/"
           class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Sales</span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Suport</span>
       </div>
       <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
         © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.

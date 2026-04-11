@@ -9,7 +9,7 @@ export default defineNuxtConfig({
         class: 'dark',
         lang: 'ca'
       },
-      title: 'TICKET-FAST | Cartelera',
+      title: 'TICKET-FAST | Cartellera',
       meta: [{ name: 'viewport', content: 'width=device-width, initial-scale=1' }],
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },

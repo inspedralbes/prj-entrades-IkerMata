@@ -24,7 +24,7 @@ async function enviar() {
     if (e.data && e.data.missatge) {
       errorMsg.value = e.data.missatge
     } else if (e.data && e.data.errors) {
-      errorMsg.value = 'Revisa el formulari'
+      errorMsg.value = 'Comprova les dades del formulari'
     } else {
       errorMsg.value = 'Error d\'inici de sessió'
     }
@@ -49,7 +49,7 @@ async function enviar() {
         <h1
           class="font-headline mb-2 text-center text-3xl font-bold uppercase tracking-tight text-white md:text-4xl"
         >
-          Iniciar sessió
+          Inici de sessió
         </h1>
         <p class="mb-8 text-center font-body text-sm text-stone-500">
           Accedeix amb el teu compte TICKET-FAST
@@ -106,7 +106,7 @@ async function enviar() {
             to="/registre"
             class="font-semibold text-primary transition hover:text-red-400"
           >
-            Crear compte
+            Crea un compte
           </NuxtLink>
         </p>
       </div>
@@ -115,7 +115,7 @@ async function enviar() {
         to="/"
         class="font-headline mt-10 text-sm uppercase tracking-wider text-stone-500 transition hover:text-white"
       >
-        ← Tornar a la cartelera
+        ← Tornar a la cartellera
       </NuxtLink>
     </main>
   </div>

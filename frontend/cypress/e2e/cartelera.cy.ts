@@ -10,6 +10,6 @@ describe('Cartellera', () => {
   it('enllaç cap a iniciar sessió o navegació principal', () => {
     cy.visit('/')
     cy.get('nav').should('exist')
-    cy.contains('a', 'Cartelera', { matchCase: false })
+    cy.contains('a', 'Cartellera', { matchCase: false })
   })
 })

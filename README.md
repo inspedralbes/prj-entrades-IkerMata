@@ -4,18 +4,18 @@ Projecte transversal: **frontend Nuxt 3**, **gateway Node (Express + Socket.IO)*
 
 ## Integrants
 
-- *(Afegeix aquí els noms del grup)*
+- Iker Mata García
 
-## Enllaços opcionals
+## Enllaços
 
-- **Prototip / disseny:** *(URL si en tens)*
-- **Producció:** *(URL quan la tingueu)*
+- **Prototip / disseny (Google Stitch):** [https://stitch.withgoogle.com/projects/11757740297033267871?pli=1](https://stitch.withgoogle.com/projects/11757740297033267871?pli=1)
+- **Producció:** [https://prj-entrades-ikermata.daw.inspedralbes.cat/](https://prj-entrades-ikermata.daw.inspedralbes.cat/)
 
 *(El gestor de tasques o altres enllaços interns els pots afegir quan el tutor ho indiqui.)*
 
 ## Estat
 
-*(Breu descripció del punt on esteu: MVP, proves, lliurament, etc.)*
+Projecte funcional amb Docker, API Laravel, gateway Socket.IO i frontend Nuxt; desplegament de referència a l’URL de producció.
 
 ## Instal·lació i configuració
 

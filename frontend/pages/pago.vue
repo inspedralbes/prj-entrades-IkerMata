@@ -226,7 +226,7 @@ async function enviarCompra() {
       alert('La sessió ha caducat, cal tornar a entrar')
       navigateTo('/login')
     } else {
-      let msg = 'Error en desar la compra'
+      let msg = 'Error en processar la compra'
       if (e && e.data) {
         if (e.data.missatge) {
           msg = e.data.missatge
@@ -501,11 +501,11 @@ const butaquesUrl = computed(() => `/butaques?peli=${peliId}&sessio=${sessioId}`
           to="/"
           class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Cines</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Sales</span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Premium</span>
-        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Soporte</span>
+        <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">Suport</span>
       </div>
       <p class="text-center font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-700">
         © {{ new Date().getFullYear() }} TICKET-FAST. THE NOIR PREMIERE.
@@ -519,7 +519,7 @@ const butaquesUrl = computed(() => `/butaques?peli=${peliId}&sessio=${sessioId}`
         :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartellera</span>
       </NuxtLink>
       <NuxtLink
         to="/mis-entrades"
@@ -527,7 +527,7 @@ const butaquesUrl = computed(() => `/butaques?peli=${peliId}&sessio=${sessioId}`
         :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Les meves entrades</span>
       </NuxtLink>
     </div>
   </div>

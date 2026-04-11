@@ -32,7 +32,7 @@ const featured = computed(() => movies.value[0] ?? null)
 const recommendationMovie = computed(() => movies.value[1] ?? movies.value[0] ?? null)
 
 function heroTitleLines(titol) {
-  if (!titol) return ['Cartelera']
+  if (!titol) return ['Cartellera']
   const w = String(titol).trim().split(/\s+/)
   if (w.length <= 2) {
     return [w.join(' ')]
@@ -144,7 +144,7 @@ onUnmounted(() => {
             </template>
             <template v-else>
               LA <br >
-              <span class="text-primary-container">CARTELERA</span>
+              <span class="text-primary-container">CARTELLERA</span>
             </template>
           </h1>
           <div class="flex flex-col items-start gap-12 md:flex-row md:items-end">
@@ -162,13 +162,13 @@ onUnmounted(() => {
                   :to="`/sala?peli=${featured.id}`"
                   class="bg-white px-8 py-5 text-sm font-black uppercase tracking-widest text-black transition-colors hover:bg-primary md:px-12"
                 >
-                  Ver sesiones
+                  Veure sessions
                 </NuxtLink>
                 <span
                   v-else
                   class="cursor-not-allowed bg-stone-700 px-8 py-5 text-sm font-black uppercase tracking-widest text-stone-400 md:px-12"
                 >
-                  Próximamente
+                  Properament
                 </span>
               </div>
             </div>
@@ -176,10 +176,10 @@ onUnmounted(() => {
               <div class="h-12 w-[2px] bg-primary" />
               <div>
                 <p class="mb-1 text-[10px] font-bold uppercase tracking-widest text-stone-500">
-                  Estado
+                  Estat
                 </p>
                 <p class="font-headline text-2xl uppercase text-white">
-                  {{ featured.hi_ha_disponibilitat ? 'Entradas disponibles' : 'Completo' }}
+                  {{ featured.hi_ha_disponibilitat ? 'Entrades disponibles' : 'Esgotat' }}
                 </p>
               </div>
             </div>
@@ -187,7 +187,7 @@ onUnmounted(() => {
         </div>
       </section>
 
-      <!-- Cartelera grid -->
+      <!-- Graella cartellera -->
       <section class="bg-surface-container-lowest px-6 py-24 md:px-12 md:py-40">
         <div class="mx-auto max-w-screen-2xl">
           <div class="mb-16 flex flex-col justify-between gap-8 md:mb-32 md:flex-row md:items-end">
@@ -195,32 +195,32 @@ onUnmounted(() => {
               class="font-headline text-5xl font-black uppercase leading-none tracking-tighter text-white md:text-8xl"
             >
               LA <br >
-              CARTELERA
+              CARTELLERA
             </h2>
             <div class="text-left md:text-right">
               <p class="font-label mb-2 text-xs uppercase tracking-widest text-stone-500">
-                Sesiones en tiempo real
+                Sessions en temps real
               </p>
               <p class="text-lg font-bold tracking-widest text-primary">
-                Disponibilidad actualizada
+                Disponibilitat actualitzada
               </p>
             </div>
           </div>
 
           <div v-if="pending" class="py-24 text-center font-label text-stone-400">
-            Cargando cartelera…
+            S’està carregant la cartellera…
           </div>
           <div v-else-if="error" class="py-24 text-center text-error">
-            Error al cargar datos.
+            Error en carregar les dades.
           </div>
           <div v-else-if="!movies.length" class="py-24 text-center text-on-surface-variant">
-            No hay películas disponibles.
+            No hi ha pel·lícules disponibles.
           </div>
           <div v-else class="relative">
             <button
               type="button"
               class="absolute left-1 top-1/2 z-10 flex -translate-y-1/2 items-center justify-center border border-stone-700 bg-stone-950/95 p-1.5 text-stone-300 shadow-lg transition hover:border-primary hover:text-primary md:left-0 md:p-2"
-              aria-label="Anterior"
+              aria-label="Anterior imatge"
               @click="scrollCarousel(-1)"
             >
               <span class="material-symbols-outlined text-2xl md:text-3xl">chevron_left</span>
@@ -266,7 +266,7 @@ onUnmounted(() => {
                         movie.hi_ha_disponibilitat ? 'text-primary' : 'text-stone-500'
                       "
                     >
-                      {{ movie.hi_ha_disponibilitat ? 'Disponible' : 'Completo' }}
+                      {{ movie.hi_ha_disponibilitat ? 'Disponible' : 'Esgotat' }}
                     </span>
                     <span class="font-label text-[10px] uppercase tracking-widest text-stone-600">
                       Veure sessions →
@@ -309,7 +309,7 @@ onUnmounted(() => {
               class="font-label mb-6 flex items-center gap-4 text-sm font-bold uppercase tracking-[0.5em] text-primary"
             >
               <span class="h-px w-12 bg-primary" />
-              Recomendación
+              Recomanació
             </p>
             <p
               v-if="recommendationMovie"
@@ -320,7 +320,7 @@ onUnmounted(() => {
             <h2
               class="font-headline mb-8 text-4xl font-bold uppercase italic tracking-tighter text-white md:text-7xl"
             >
-              «El cine es la memoria del tiempo que no volverá.»
+              «El cinema és la memòria del temps que no tornarà.»
             </h2>
             <p class="font-label text-xl uppercase tracking-widest text-stone-300">
               — TICKET-FAST
@@ -341,16 +341,16 @@ onUnmounted(() => {
           to="/"
           class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-500 transition-all duration-300 hover:text-white"
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">
-          Cines
+          Sales
         </span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">
           Premium
         </span>
         <span class="font-sans text-[10px] font-medium uppercase tracking-[0.2em] text-stone-600">
-          Soporte
+          Suport
         </span>
       </div>
       <div class="h-px w-full max-w-4xl bg-gradient-to-r from-transparent via-stone-800 to-transparent" />
@@ -369,7 +369,7 @@ onUnmounted(() => {
         :class="route.path === '/' ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">movie</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Cartelera</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Cartellera</span>
       </NuxtLink>
       <NuxtLink
         to="/mis-entrades"
@@ -377,7 +377,7 @@ onUnmounted(() => {
         :class="route.path.startsWith('/mis-entrades') ? 'text-primary' : 'text-stone-400'"
       >
         <span class="material-symbols-outlined">confirmation_number</span>
-        <span class="text-[8px] font-bold uppercase tracking-widest">Mis entradas</span>
+        <span class="text-[8px] font-bold uppercase tracking-widest">Les meves entrades</span>
       </NuxtLink>
     </div>
   </div>

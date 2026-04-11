@@ -47,7 +47,7 @@ async function sortir() {
               : 'font-light text-stone-400 hover:text-red-400'
           "
         >
-          Cartelera
+          Cartellera
         </NuxtLink>
         <NuxtLink
           to="/mis-entrades"
@@ -58,7 +58,7 @@ async function sortir() {
               : 'font-light text-stone-400 hover:text-red-400'
           "
         >
-          Mis entradas
+          Les meves entrades
         </NuxtLink>
       </template>
       <template v-else>
@@ -97,7 +97,7 @@ async function sortir() {
             : 'font-light text-stone-400 hover:text-red-400'
         "
       >
-        Login
+        Entra
       </NuxtLink>
       <div
         v-else
