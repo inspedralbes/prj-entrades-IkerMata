@@ -17,7 +17,6 @@ use App\Models\PreuSessio;
 use App\Models\Sala;
 use App\Models\Sessio;
 use App\Models\Seient;
-use Illuminate\Http\Request;
 
 Route::post('/register', [AuthController::class, 'registrar']);
 Route::post('/login', [AuthController::class, 'login']);
