@@ -33,3 +33,9 @@ docker compose up --build
 ## Documentació
 
 Vegeu [doc/README.md](doc/README.md) (índex dels documents de la pràctica) i [frontend/README.md](frontend/README.md) (Nuxt, desenvolupament local, **Cypress**). La carpeta [`agents/`](agents/) conté guies per component (Laravel, Node, Redis, Socket, etc.) per al desenvolupament; no formen part del lliurable mínim de l’enunciat.
+
+### Metodologia IA + OpenSpec (lliurament assignatura)
+
+- **Traçabilitat de prompts:** [docs/prompts-log.md](docs/prompts-log.md)
+- **Memòria / PDF (font):** [docs/entrega-metodologia-IA-OpenSpec.md](docs/entrega-metodologia-IA-OpenSpec.md) — versió imprimible: [docs/entrega-metodologia-IA-OpenSpec.html](docs/entrega-metodologia-IA-OpenSpec.html) (obrir al navegador → *Imprimir* → *Desar com a PDF*).
+- **Especificació amb noms de l’enunciat:** carpeta [specs/](specs/) (alineada amb `openspec/changes/sincronitzacio-estat-butaques-inicial/`).
