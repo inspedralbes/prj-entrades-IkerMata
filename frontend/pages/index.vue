@@ -208,7 +208,7 @@ onUnmounted(() => {
           </div>
 
           <div v-if="pending" class="py-24 text-center font-label text-stone-400">
-            S’està carregant la cartellera…
+              S’està carregant la cartellera…
           </div>
           <div v-else-if="error" class="py-24 text-center text-error">
             Error en carregar les dades.

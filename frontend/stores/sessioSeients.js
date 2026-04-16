@@ -89,14 +89,38 @@ export const useSessioSeientsStore = defineStore('sessioSeients', () => {
     expiresBySeientId.value = m
   }
 
+  /**
+   * Treu de la selecció seients que ja no són una reserva temporal vàlida
+   * (p. ex. comprats / alliberats / caducats). Evita que després d’una compra
+   * tornis a butaques i continuïn marcats com a triats.
+   */
+  function pruneSeleccioSegonsLlista(list) {
+    if (!list || !Array.isArray(list)) {
+      selectedSeients.value = []
+      return
+    }
+    selectedSeients.value = selectedSeients.value.filter((s) => {
+      const cur = list.find((x) => Number(x.id) === Number(s.id))
+      if (!cur) {
+        return false
+      }
+      if (cur.reservat) {
+        return false
+      }
+      return !!cur.la_meva_reserva
+    })
+  }
+
   /** Sincronitza la llista sencera des del servidor (useFetch / refresh). */
   function aplicaLlistaDesDelServidor(list) {
     if (!list || !Array.isArray(list)) {
       llistaSeients.value = []
+      pruneSeleccioSegonsLlista([])
       return
     }
     llistaSeients.value = list.map((s) => ({ ...s }))
     syncExpiresFromLlista(llistaSeients.value)
+    pruneSeleccioSegonsLlista(llistaSeients.value)
   }
 
   function actualitzaSegonsReserva() {

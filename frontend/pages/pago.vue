@@ -8,6 +8,7 @@ const route = useRoute()
 const baseURL = useApiBase()
 const gatewayURL = usePublicGatewayUrl()
 const authStore = useAuthStore()
+const sessioSeientsStore = useSessioSeientsStore()
 
 function primerQuery(val) {
   if (val == null) return undefined
@@ -218,6 +219,15 @@ async function enviarCompra() {
       body: cos,
       headers: authStore.capcalarsAutenticacio()
     })
+    sessioSeientsStore.buidaSeleccio()
+    sessioSeientsStore.setReservaEnCurs(false)
+    if (sessioId && typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`ticketfast_expira_${String(sessioId)}`)
+      } catch (_) {
+        /* ignore */
+      }
+    }
     navigateTo('/mis-entrades')
   } catch (e) {
     if (e.response && e.response.status === 401) {
