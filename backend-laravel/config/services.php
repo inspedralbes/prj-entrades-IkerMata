@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    /*
+    | OMDb (www.omdbapi.com) — només servidor; no exposar al frontend.
+    */
+    'omdb' => [
+        'key' => env('OMDB_API_KEY'),
+    ],
+
+    /*
+    | TMDb (themoviedb.org) — sinopsis/títol en català (o castellà com a segona opció).
+    | Opcional: sense clau es manté el text en anglès d’OMDb.
+    */
+    'tmdb' => [
+        'key' => env('TMDB_API_KEY'),
+    ],
+
 ];

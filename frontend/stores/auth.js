@@ -68,13 +68,29 @@ export const useAuthStore = defineStore('auth', () => {
     const config = useRuntimeConfig()
     const url = resolvePublicGatewayUrl(config.public.gatewayUrl) + '/api/logout'
 
+    /** Token després d’un reset de BD o cookie antiga pot no existir a `personal_access_tokens` → 401; evitem petició buida. */
+    const authToken = token.value || tokenCookie.value
+    if (!authToken) {
+      token.value = null
+      user.value = null
+      tokenCookie.value = null
+      userCookie.value = null
+      return
+    }
+
+    const headers = {
+      Accept: 'application/json',
+      Authorization: 'Bearer ' + authToken
+    }
+
     try {
       await $fetch(url, {
         method: 'POST',
-        headers: capcalarsAutenticacio()
+        headers
       })
     } catch (e) {
       var status = e.statusCode ?? e.response?.status
+      /** 401: token ja invàlid o BD reiniciada; el client neteja igual. */
       if (status !== 401) {
         console.error('Error enviant petició de logout al servidor:', e)
       }

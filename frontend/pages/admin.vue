@@ -160,6 +160,185 @@ const formulari = ref({ titol: '', descripcio: '', imatge_url: '', durada_minuts
 const guardantPeli = ref(false)
 const esborrant = ref(false)
 
+/** OMDb (IMDb): dades via Laravel, no exposem la clau al navegador. */
+const omdbImdbId = ref('')
+const omdbCerca = ref('')
+const omdbResultats = ref([])
+const carregantOmdb = ref(false)
+
+async function importarDesOmdb() {
+  const i = String(omdbImdbId.value || '').trim()
+  if (!i) {
+    alert('Indica un IMDb ID (ex. tt3896198).')
+    return
+  }
+  carregantOmdb.value = true
+  try {
+    const root = toValue(baseURL)
+    const data = await $fetch(`${root}/admin/omdb`, {
+      query: { i },
+      headers: authStore.capcalarsAutenticacio()
+    })
+    formulari.value.titol = data.titol
+    formulari.value.descripcio = data.descripcio
+    formulari.value.imatge_url = data.imatge_url || ''
+    formulari.value.durada_minuts = Number(data.durada_minuts) || 90
+  } catch (e) {
+    const msg = e?.data?.error ?? e?.message ?? 'No s’ha pogut importar des d’OMDb.'
+    alert(msg)
+  } finally {
+    carregantOmdb.value = false
+  }
+}
+
+async function cercarOmdb() {
+  const s = String(omdbCerca.value || '').trim()
+  if (s.length < 2) {
+    alert('Escriu almenys 2 caràcters per cercar.')
+    return
+  }
+  carregantOmdb.value = true
+  try {
+    const root = toValue(baseURL)
+    const data = await $fetch(`${root}/admin/omdb/search`, {
+      query: { s },
+      headers: authStore.capcalarsAutenticacio()
+    })
+    omdbResultats.value = Array.isArray(data?.results) ? data.results : []
+    if (!omdbResultats.value.length) {
+      alert('Cap resultat de tipus «movie». Prova un altre títol o usa IMDb ID directe.')
+    }
+  } catch (e) {
+    omdbResultats.value = []
+    const msg = e?.data?.error ?? e?.message ?? 'Error cercant a OMDb.'
+    alert(msg)
+  } finally {
+    carregantOmdb.value = false
+  }
+}
+
+async function triarResultatOmdb(r) {
+  omdbImdbId.value = r.imdbID
+  omdbResultats.value = []
+  await importarDesOmdb()
+}
+
+/** OMDb API (servidor) → INSERT a `pelis` */
+const omdbFetchIdsText = ref('')
+const fetchOmdbBusy = ref(false)
+
+/** Cerca per títol i importa N resultats (sense escriure tt…) */
+const omdbImportQuery = ref('')
+const omdbImportLimit = ref(8)
+
+async function importarDemo25() {
+  if (
+    !confirm(
+      'Es baixaran fins a 25 pel·lícules des d’OMDb (llista recomanada al servidor). Pot trigar més d’un minut. Les que ja existeixin (mateix títol) es saltaran. Continuar?'
+    )
+  ) {
+    return
+  }
+  fetchOmdbBusy.value = true
+  try {
+    const root = toValue(baseURL)
+    const res = await $fetch(`${root}/admin/peliculas/fetch-omdb-demo`, {
+      method: 'POST',
+      headers: authStore.capcalarsAutenticacio()
+    })
+    await refreshPelis()
+    let msg = `S’han afegit ${res.imported} pel·lícula(es) noves.`
+    if (res.skipped && Object.keys(res.skipped).length) {
+      msg += `\n\nSaltades (ja existien): ${Object.keys(res.skipped).length}`
+    }
+    if (res.errors && Object.keys(res.errors).length) {
+      msg += `\n\nErrors parcials:\n${JSON.stringify(res.errors, null, 2)}`
+    }
+    alert(msg)
+  } catch (e) {
+    const d = e?.data
+    alert(d?.error ?? d?.message ?? e?.message ?? 'Error')
+  } finally {
+    fetchOmdbBusy.value = false
+  }
+}
+
+async function cercarIimportarOmdb() {
+  const q = String(omdbImportQuery.value || '').trim()
+  if (q.length < 2) {
+    alert('Escriu almenys 2 caràcters per cercar (millor en anglès).')
+    return
+  }
+  let lim = Number(omdbImportLimit.value)
+  if (Number.isNaN(lim) || lim < 1) {
+    lim = 8
+  }
+  lim = Math.min(15, Math.max(1, lim))
+  fetchOmdbBusy.value = true
+  try {
+    const root = toValue(baseURL)
+    const res = await $fetch(`${root}/admin/peliculas/fetch-omdb-cerca`, {
+      method: 'POST',
+      headers: authStore.capcalarsAutenticacio(),
+      body: { q, limit: lim }
+    })
+    await refreshPelis()
+    let msg = `S’han importat ${res.imported} pel·lícula(es) des de la cerca «${res.cerca || q}».`
+    if (res.errors && Object.keys(res.errors).length) {
+      msg += `\n\nAlguns títols han fallat:\n${JSON.stringify(res.errors, null, 2)}`
+    }
+    alert(msg)
+  } catch (e) {
+    const d = e?.data
+    const msg = d?.error ?? (d?.per_id ? JSON.stringify(d.per_id, null, 2) : null) ?? e?.message ?? 'Error'
+    alert(msg)
+  } finally {
+    fetchOmdbBusy.value = false
+  }
+}
+
+async function baixarIguardarOmdb() {
+  const raw = String(omdbFetchIdsText.value || '').trim()
+  if (!raw) {
+    alert('Escriu almenys un IMDb ID (ex. tt3896198).')
+    return
+  }
+  const ids = raw
+    .split(/[\s,;]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => /^tt\d+$/i.test(s))
+  if (!ids.length) {
+    alert('No s’han trobat IDs vàlids. Format: tt seguit de números (ex. tt0468569).')
+    return
+  }
+  fetchOmdbBusy.value = true
+  try {
+    const root = toValue(baseURL)
+    const res = await $fetch(`${root}/admin/peliculas/fetch-omdb`, {
+      method: 'POST',
+      headers: authStore.capcalarsAutenticacio(),
+      body: { imdb_ids: ids }
+    })
+    await refreshPelis()
+    let msg = `S’han guardat ${res.imported} pel·lícula(es) des d’OMDb.`
+    if (res.errors && Object.keys(res.errors).length) {
+      msg += `\n\nAlguns IDs han fallat:\n${JSON.stringify(res.errors, null, 2)}`
+    }
+    alert(msg)
+    omdbFetchIdsText.value = ''
+  } catch (e) {
+    const d = e?.data
+    const msg =
+      d?.error ??
+      (d?.per_id ? JSON.stringify(d.per_id, null, 2) : null) ??
+      e?.message ??
+      'Error'
+    alert(msg)
+  } finally {
+    fetchOmdbBusy.value = false
+  }
+}
+
 const panellTempsReal = ref(null)
 const reservesActivesMostrar = computed(() => {
   const p = panellTempsReal.value
@@ -285,6 +464,9 @@ onUnmounted(() => {
 function novaPeli() {
   editantId.value = null
   formulari.value = { titol: '', descripcio: '', imatge_url: '', durada_minuts: 60 }
+  omdbImdbId.value = ''
+  omdbCerca.value = ''
+  omdbResultats.value = []
   mostraForm.value = true
 }
 
@@ -379,6 +561,95 @@ function retallDescripcio(t) {
         </button>
       </div>
 
+      <section class="mb-10 border border-primary/40 bg-stone-950/70 p-6 md:p-8">
+        <h2 class="font-headline text-lg font-bold uppercase tracking-tight text-primary">
+          OMDb API → guardar a la base de dades
+        </h2>
+        <p class="mt-2 max-w-3xl font-body text-sm text-stone-400">
+          El servidor crida <strong class="text-stone-300">omdbapi.com</strong> amb la teva
+          <code class="text-primary/90">OMDB_API_KEY</code> i fa <strong class="text-stone-300">INSERT</strong> a
+          <code class="text-stone-500">pelis</code>.
+        </p>
+
+        <div class="mb-6 rounded border border-dashed border-primary/60 bg-primary/5 p-5">
+          <p class="font-label text-[10px] font-bold uppercase tracking-widest text-primary">
+            Opció ràpida — 25 pel·lícules automàtiques
+          </p>
+          <p class="mt-2 font-body text-xs text-stone-400">
+            Una sola acció: el servidor importa una <strong class="text-stone-300">llista fixa de 25 IMDb IDs</strong> (configuració al backend).
+            No cal escriure res. Si una pel·lícula ja existeix (mateix títol), es salta.
+          </p>
+          <button
+            type="button"
+            class="mt-4 w-full border-2 border-primary bg-primary/90 px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-black transition hover:bg-primary disabled:opacity-50 sm:w-auto"
+            :disabled="fetchOmdbBusy || guardantPeli || esborrant"
+            @click="importarDemo25"
+          >
+            {{ fetchOmdbBusy ? 'Important 25 des d’OMDb…' : 'Importar 25 pel·lícules (OMDb)' }}
+          </button>
+        </div>
+
+        <div class="mt-6 rounded border border-stone-700/80 bg-black/25 p-4">
+          <p class="font-label text-[10px] font-bold uppercase tracking-widest text-primary">
+            Opció A — Per títol (no calen IDs)
+          </p>
+          <p class="mt-1 font-body text-xs text-stone-500">
+            OMDb retorna diversos resultats; es guarden les primeres <strong class="text-stone-400">N</strong> pel·lícules (màx. 15). Prova títols en anglès si no surt res.
+          </p>
+          <div class="mt-4 flex flex-wrap items-end gap-3">
+            <label class="min-w-[14rem] flex-1">
+              <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Text de cerca</span>
+              <input
+                v-model="omdbImportQuery"
+                type="text"
+                placeholder="guardians galaxy"
+                class="mt-1 w-full border border-stone-700 bg-stone-950/80 px-3 py-2 text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                @keydown.enter.prevent="cercarIimportarOmdb"
+              >
+            </label>
+            <label class="w-28">
+              <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Quantitat</span>
+              <input
+                v-model.number="omdbImportLimit"
+                type="number"
+                min="1"
+                max="15"
+                class="mt-1 w-full border border-stone-700 bg-stone-950/80 px-2 py-2 text-center font-mono text-sm text-white focus:border-primary focus:outline-none"
+              >
+            </label>
+            <button
+              type="button"
+              class="border border-white/20 bg-stone-900 px-5 py-2 font-headline text-[10px] font-bold uppercase tracking-wider text-white transition hover:border-primary hover:text-primary disabled:opacity-50"
+              :disabled="fetchOmdbBusy || guardantPeli || esborrant"
+              @click="cercarIimportarOmdb"
+            >
+              {{ fetchOmdbBusy ? 'Cercant…' : 'Cercar i importar' }}
+            </button>
+          </div>
+        </div>
+
+        <p class="mt-6 font-label text-[10px] font-bold uppercase tracking-widest text-stone-500">
+          Opció B — Per IMDb ID (tt…)
+        </p>
+        <p class="mt-1 font-body text-xs text-stone-500">
+          Un ID per línia o separats per coma. Exemple: <code class="text-stone-500">tt3896198</code>
+        </p>
+        <textarea
+          v-model="omdbFetchIdsText"
+          rows="4"
+          class="mt-4 w-full border border-stone-700 bg-black/40 px-3 py-2 font-mono text-sm text-stone-200 placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          placeholder="tt3896198&#10;tt0468569"
+        />
+        <button
+          type="button"
+          class="mt-4 border border-primary bg-primary px-6 py-3 font-headline text-xs font-bold uppercase tracking-wider text-black transition hover:bg-red-400 disabled:opacity-50"
+          :disabled="fetchOmdbBusy || guardantPeli || esborrant"
+          @click="baixarIguardarOmdb"
+        >
+          {{ fetchOmdbBusy ? 'Baixant d’OMDb…' : 'Baixar i guardar' }}
+        </button>
+      </section>
+
       <div
         v-if="mostraForm"
         class="mb-10 border border-stone-800 bg-surface-container/90 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.35)] md:p-8"
@@ -386,6 +657,73 @@ function retallDescripcio(t) {
         <h2 class="font-headline mb-6 text-xl font-bold uppercase text-white">
           {{ editantId ? 'Edita' : 'Nova' }} pel·lícula
         </h2>
+
+        <div
+          class="mb-8 border border-stone-700 bg-stone-950/50 p-4 md:p-5"
+        >
+          <p class="font-label text-[10px] font-bold uppercase tracking-widest text-primary">
+            Importar des d’OMDb (IMDb)
+          </p>
+          <p class="mt-2 font-body text-xs text-stone-500">
+            La clau API és només al servidor (<code class="text-stone-400">OMDB_API_KEY</code>). Omple els camps de sota; després prem «Desar».
+          </p>
+          <div class="mt-4 flex flex-wrap items-end gap-3">
+            <label class="min-w-[12rem] flex-1">
+              <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">IMDb ID</span>
+              <input
+                v-model="omdbImdbId"
+                type="text"
+                placeholder="tt3896198"
+                class="mt-1 w-full border border-stone-700 bg-stone-950/80 px-3 py-2 font-mono text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              >
+            </label>
+            <button
+              type="button"
+              class="border border-primary/60 bg-primary/10 px-4 py-2 font-headline text-[10px] font-bold uppercase tracking-wider text-primary transition hover:bg-primary/20 disabled:opacity-50"
+              :disabled="carregantOmdb || guardantPeli"
+              @click="importarDesOmdb"
+            >
+              {{ carregantOmdb ? 'Carregant…' : 'Importar' }}
+            </button>
+          </div>
+          <div class="mt-6 flex flex-wrap items-end gap-3 border-t border-stone-800 pt-4">
+            <label class="min-w-[12rem] flex-1">
+              <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Cercar pel·lícula</span>
+              <input
+                v-model="omdbCerca"
+                type="text"
+                placeholder="Títol en anglès sol funcionar millor"
+                class="mt-1 w-full border border-stone-700 bg-stone-950/80 px-3 py-2 text-sm text-white placeholder:text-stone-600 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                @keydown.enter.prevent="cercarOmdb"
+              >
+            </label>
+            <button
+              type="button"
+              class="border border-stone-600 px-4 py-2 font-headline text-[10px] font-bold uppercase tracking-wider text-stone-300 transition hover:border-stone-500 hover:text-white disabled:opacity-50"
+              :disabled="carregantOmdb || guardantPeli"
+              @click="cercarOmdb"
+            >
+              Cercar
+            </button>
+          </div>
+          <ul
+            v-if="omdbResultats.length"
+            class="mt-3 max-h-40 space-y-1 overflow-y-auto border border-stone-800 bg-black/30 p-2 text-sm"
+          >
+            <li v-for="r in omdbResultats" :key="r.imdbID">
+              <button
+                type="button"
+                class="w-full text-left px-2 py-1.5 text-stone-300 transition hover:bg-stone-900 hover:text-white"
+                :disabled="carregantOmdb"
+                @click="triarResultatOmdb(r)"
+              >
+                <span class="font-medium text-white">{{ r.Title }}</span>
+                <span class="text-stone-500"> · {{ r.Year }} · {{ r.imdbID }}</span>
+              </button>
+            </li>
+          </ul>
+        </div>
+
         <div class="grid gap-6 md:grid-cols-2">
           <label class="block md:col-span-2">
             <span class="font-label text-[10px] uppercase tracking-widest text-stone-500">Títol</span>

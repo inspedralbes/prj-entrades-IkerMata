@@ -16,8 +16,10 @@ services:
       # NUXT_PUBLIC_API_BASE=http://IP:8001/api
       # NUXT_PUBLIC_GATEWAY_URL=http://IP:3003
       - GATEWAY_URL=${NUXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
-      - NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE:-http://localhost:8001/api}
+      - NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE:-http://localhost:3003/api}
       - NUXT_PUBLIC_GATEWAY_URL=${NUXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
+      # SSR dins Docker: no usar localhost:8001; Nginx Laravel al servei «web» (port 80 intern).
+      - NUXT_API_INTERNAL_BASE=${NUXT_API_INTERNAL_BASE:-http://web/api}
     networks:
       - ticket-net
     depends_on:
@@ -71,6 +73,8 @@ services:
       - REDIS_CLIENT=predis
       # Mateix canal Redis pub/sub que el gateway (sense prefix per defecte de Laravel)
       - REDIS_PREFIX=
+      # OMDb (opcional): definir també a backend-laravel/.env o aquí
+      - OMDB_API_KEY=${OMDB_API_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
       interval: 5s

@@ -270,30 +270,19 @@ function sessioSlotClass(disponible) {
               <p
                 class="font-headline mb-3 text-[10px] font-semibold uppercase tracking-[0.35em] text-red-400/95 md:text-xs"
               >
-                Passi exclusiu · TICKET-FAST
+                Sessions · TICKET-FAST
               </p>
               <h1
                 class="font-headline max-w-[95%] text-4xl font-bold uppercase leading-[0.95] tracking-tight text-white md:text-5xl lg:text-6xl xl:text-7xl"
               >
                 {{ peli.titol }}
               </h1>
-              <p
-                v-if="peli.durada_minuts"
-                class="mt-4 font-body text-sm text-stone-400"
+              <NuxtLink
+                :to="`/pelicula?peli=${peli.id}`"
+                class="font-headline mt-6 inline-block text-xs font-bold uppercase tracking-[0.2em] text-primary transition hover:text-white"
               >
-                Durada aproximada: {{ peli.durada_minuts }} min
-              </p>
-
-              <div v-if="peli.descripcio" class="mt-8 max-w-xl border-t border-white/10 pt-8">
-                <h3 class="font-headline text-xs font-bold uppercase tracking-[0.2em] text-stone-400">
-                  La història
-                </h3>
-                <p
-                  class="font-body mt-3 text-sm leading-relaxed text-stone-300 md:text-base md:leading-relaxed"
-                >
-                  {{ peli.descripcio }}
-                </p>
-              </div>
+                Veure fitxa completa (sinopsi, durada, estat)
+              </NuxtLink>
             </div>
           </section>
 

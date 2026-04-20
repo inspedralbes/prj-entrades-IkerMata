@@ -68,17 +68,6 @@ app.post('/api/reservar', function (req, res) {
         });
 });
 
-app.get('/api/peliculas', function (req, res) {
-    axios.get(LARAVEL_API_URL + '/peliculas', { headers: { 'Accept': 'application/json' } })
-        .then(function (response) {
-            res.status(response.status).json(response.data);
-        })
-        .catch(function (error) {
-            console.error('Gateway: Error en peliculas:', error.response ? error.response.status : error.message);
-            res.status(error.response ? error.response.status : 500).json(error.response ? error.response.data : { error: 'Internal Server Error' });
-        });
-});
-
 // Login: reenvia credencials a Laravel
 app.post('/api/login', function (req, res) {
     axios.post(LARAVEL_API_URL + '/login', req.body, { headers: { 'Accept': 'application/json' } })
@@ -151,6 +140,68 @@ app.post('/api/comprar', function (req, res) {
                 payload = error.response.data;
             }
             res.status(status).json(payload);
+        });
+});
+
+/**
+ * Proxy genèric: tota petició GET/PUT/PATCH/DELETE (i POST no capturada abans) sota /api → Laravel.
+ * Les rutes específiques (reservar, login, register, logout, comprar) es resolen abans.
+ */
+function laravelUrlFromRequest(req) {
+    var tail = req.originalUrl.replace(/^\/api\/?/, '/');
+    if (!tail.startsWith('/')) {
+        tail = '/' + tail;
+    }
+    return LARAVEL_API_URL.replace(/\/$/, '') + tail;
+}
+
+function forwardHeadersFromRequest(req) {
+    var h = {
+        Accept: 'application/json',
+    };
+    if (req.headers.authorization) {
+        h.Authorization = req.headers.authorization;
+    }
+    if (req.headers['content-type']) {
+        h['Content-Type'] = req.headers['content-type'];
+    }
+    return h;
+}
+
+app.use('/api', function (req, res, next) {
+    var url = laravelUrlFromRequest(req);
+    var method = (req.method || 'GET').toUpperCase();
+    var cfg = {
+        method: method,
+        url: url,
+        headers: forwardHeadersFromRequest(req),
+        validateStatus: function () {
+            return true;
+        },
+    };
+    if (method !== 'GET' && method !== 'HEAD' && req.body && typeof req.body === 'object' && Object.keys(req.body).length) {
+        cfg.data = req.body;
+    }
+    axios(cfg)
+        .then(function (response) {
+            var d = response.data;
+            var st = response.status;
+            if (typeof d === 'object' && d !== null) {
+                return res.status(st).json(d);
+            }
+            return res.status(st).send(d === undefined ? '' : String(d));
+        })
+        .catch(function (error) {
+            console.error('Gateway proxy API:', error.response ? error.response.status : error.message);
+            if (error.response) {
+                var ed = error.response.data;
+                var est = error.response.status;
+                if (typeof ed === 'object' && ed !== null) {
+                    return res.status(est).json(ed);
+                }
+                return res.status(est).send(ed !== undefined ? String(ed) : '');
+            }
+            res.status(500).json({ error: 'Internal Server Error' });
         });
 });
 

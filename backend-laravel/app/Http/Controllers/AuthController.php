@@ -8,6 +8,7 @@ use App\Services\AutenticacioService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Laravel\Sanctum\PersonalAccessToken;
 
 //================================ PROPIETATS / ATRIBUTS ============
 
@@ -85,16 +86,17 @@ class AuthController extends Controller
     }
 
     /**
-     * POST /api/logout — invalida el token actual.
+     * POST /api/logout — invalida el token enviat (Bearer). Ruta pública per evitar 401 si el token és antic (p. ex. reset BD).
      */
     public function logout(Request $request): JsonResponse
     {
-        $usuari = $request->user();
-        if ($usuari === null) {
-            return response()->json(['missatge' => 'No autenticat'], 401);
+        $bearer = $request->bearerToken();
+        if ($bearer) {
+            $accessToken = PersonalAccessToken::findToken($bearer);
+            if ($accessToken !== null) {
+                $accessToken->delete();
+            }
         }
-
-        $this->autenticacioService->tancarSessio($usuari);
 
         return response()->json(['missatge' => 'Sessió tancada']);
     }

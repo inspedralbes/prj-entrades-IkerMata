@@ -51,12 +51,19 @@ export function upgradeHttpToHttpsIfPageHttps(url) {
  * - Ruta relativa `NUXT_PUBLIC_API_BASE=/api`: mateix origen que la pàgina (recomanat amb HTTPS + proxy Nginx).
  * - URL absoluta: si la pàgina és HTTPS i comparteix hostname amb l'API HTTP, s'intenta passar a HTTPS.
  */
-const DEFAULT_API_BASE = 'http://localhost:8001/api'
+const DEFAULT_API_BASE = 'http://localhost:3003/api'
 
 export function useApiBase() {
   const config = useRuntimeConfig()
   const requestURL = useRequestURL()
   return computed(() => {
+    /** SSR (p. ex. Docker): el navegador usa localhost, però dins el contenidor cal el servei `web` o gateway. */
+    if (import.meta.server) {
+      const internal = config.apiInternalBase
+      if (typeof internal === 'string' && internal.trim() !== '') {
+        return normalizePublicHttpUrl(internal.trim().replace(/\/$/, ''))
+      }
+    }
     const raw = config.public.apiBase
     const s = typeof raw === 'string' ? raw.trim() : ''
     if (s.startsWith('/')) {

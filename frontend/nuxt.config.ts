@@ -36,13 +36,18 @@ export default defineNuxtConfig({
     autoImports: ['defineStore', 'storeToRefs'],
   },
   // Sobreescriptible amb NUXT_PUBLIC_API_BASE i NUXT_PUBLIC_GATEWAY_URL (veure docker-compose).
+  // apiInternalBase: només servidor (SSR dins Docker) → Nginx Laravel «web», no usar localhost.
   runtimeConfig: {
+    apiInternalBase: process.env.NUXT_API_INTERNAL_BASE || '',
     public: {
-      apiBase: 'http://localhost:8001/api',
+      apiBase: 'http://localhost:3003/api',
       gatewayUrl: 'http://localhost:3003'
     }
   },
   routeRules: {
+    /** Cartellera: useFetch fallava amb localhost:8001 dins el contenidor; SSR desactivat o bé NUXT_API_INTERNAL_BASE. */
+    '/': { ssr: false },
+    '/pelicula': { ssr: false },
     '/sala': { ssr: false },
     '/butaques': { ssr: false },
     '/mis-entrades': { ssr: false },

@@ -27,7 +27,9 @@ async function sortir() {
 </script>
 
 <template>
+  <!-- Portada: logo | Cartellera + entrades (centre) | Entra / usuari. Admin: graella 3 columnes. -->
   <nav
+    v-if="esAdmin"
     class="fixed top-0 z-50 grid w-full grid-cols-3 items-center bg-gradient-to-r from-stone-950 via-red-950/20 to-stone-950 px-4 py-6 shadow-[0_20px_50px_rgba(65,0,0,0.3)] backdrop-blur-xl md:px-12"
   >
     <NuxtLink
@@ -37,54 +39,28 @@ async function sortir() {
       TICKET-FAST
     </NuxtLink>
     <div class="flex items-center justify-center gap-6 md:gap-10">
-      <template v-if="!esAdmin">
-        <NuxtLink
-          to="/"
-          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-          :class="
-            route.path === '/'
-              ? 'font-bold text-white'
-              : 'font-light text-stone-400 hover:text-red-400'
-          "
-        >
-          Cartellera
-        </NuxtLink>
-        <NuxtLink
-          to="/mis-entrades"
-          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-          :class="
-            route.path.startsWith('/mis-entrades')
-              ? 'font-bold text-white'
-              : 'font-light text-stone-400 hover:text-red-400'
-          "
-        >
-          Les meves entrades
-        </NuxtLink>
-      </template>
-      <template v-else>
-        <NuxtLink
-          to="/admin"
-          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-          :class="
-            actiuPanellAdmin
-              ? 'font-bold text-white'
-              : 'font-light text-stone-400 hover:text-red-400'
-          "
-        >
-          Panell
-        </NuxtLink>
-        <NuxtLink
-          to="/admin#temps-real"
-          class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
-          :class="
-            actiuTempsRealAdmin
-              ? 'font-bold text-white'
-              : 'font-light text-stone-400 hover:text-red-400'
-          "
-        >
-          Temps real
-        </NuxtLink>
-      </template>
+      <NuxtLink
+        to="/admin"
+        class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+        :class="
+          actiuPanellAdmin
+            ? 'font-bold text-white'
+            : 'font-light text-stone-400 hover:text-red-400'
+        "
+      >
+        Panell
+      </NuxtLink>
+      <NuxtLink
+        to="/admin#temps-real"
+        class="font-headline text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+        :class="
+          actiuTempsRealAdmin
+            ? 'font-bold text-white'
+            : 'font-light text-stone-400 hover:text-red-400'
+        "
+      >
+        Temps real
+      </NuxtLink>
     </div>
     <div class="justify-self-end">
       <NuxtLink
@@ -105,6 +81,78 @@ async function sortir() {
       >
         <span
           class="font-headline min-w-0 truncate text-right text-xs font-light text-stone-300 md:text-sm"
+          :title="authStore.user?.nom"
+        >
+          {{ authStore.user?.nom }}
+        </span>
+        <button
+          type="button"
+          class="font-headline shrink-0 whitespace-nowrap border border-stone-600 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-stone-300 transition hover:border-primary hover:text-primary md:px-3 md:text-xs"
+          @click="sortir"
+        >
+          Sortir
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <nav
+    v-else
+    class="fixed top-0 z-50 flex w-full items-center bg-stone-950/60 bg-gradient-to-r from-stone-950 via-red-950/20 to-stone-950 px-4 py-6 shadow-[0_20px_50px_rgba(65,0,0,0.3)] backdrop-blur-xl md:px-12"
+  >
+    <div class="flex min-w-0 flex-1 items-center justify-start">
+      <NuxtLink
+        to="/"
+        class="font-headline text-xl font-bold uppercase tracking-widest text-red-500 md:text-2xl"
+      >
+        TICKET-FAST
+      </NuxtLink>
+    </div>
+    <div
+      class="flex min-w-0 flex-1 items-center justify-center gap-4 px-2 md:gap-10"
+    >
+      <NuxtLink
+        to="/"
+        class="font-headline text-center text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+        :class="
+          route.path === '/'
+            ? 'font-bold text-white'
+            : 'font-light text-stone-400 hover:text-red-400'
+        "
+      >
+        Cartellera
+      </NuxtLink>
+      <NuxtLink
+        to="/mis-entrades"
+        class="font-headline text-center text-xl uppercase tracking-tighter transition-colors duration-500 md:text-3xl"
+        :class="
+          route.path.startsWith('/mis-entrades')
+            ? 'font-bold text-white'
+            : 'font-light text-stone-400 hover:text-red-400'
+        "
+      >
+        Les meves entrades
+      </NuxtLink>
+    </div>
+    <div class="flex min-w-0 flex-1 items-center justify-end gap-2 md:gap-3">
+      <NuxtLink
+        v-if="!authStore.isAuthenticated"
+        to="/login"
+        class="font-headline text-sm uppercase tracking-tighter transition-colors duration-500 md:text-lg"
+        :class="
+          route.path.startsWith('/login')
+            ? 'font-bold text-white'
+            : 'font-light text-stone-400 hover:text-red-400'
+        "
+      >
+        Entra
+      </NuxtLink>
+      <div
+        v-else
+        class="flex max-w-[min(100%,12rem)] items-center justify-end gap-2 md:max-w-none"
+      >
+        <span
+          class="font-headline hidden min-w-0 truncate text-right text-xs text-stone-300 sm:inline md:text-sm"
           :title="authStore.user?.nom"
         >
           {{ authStore.user?.nom }}

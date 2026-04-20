@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Route;
 use Laravel\Sanctum\PersonalAccessToken;
+use App\Http\Controllers\AdminOmdbController;
+use App\Http\Controllers\AdminOmdbImportarController;
+use App\Http\Controllers\AdminPeliculaImportController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminInformesController;
 use App\Http\Controllers\CompraController;
@@ -22,6 +25,8 @@ use App\Models\Seient;
 
 Route::post('/register', [AuthController::class, 'registrar']);
 Route::post('/login', [AuthController::class, 'login']);
+/** Logout sense auth:sanctum: revoca el token si és vàlid; si no (p. ex. BD reiniciada), resposta 200 igual. */
+Route::post('/logout', [AuthController::class, 'logout']);
 
 // Redis health check — infra temps real (Agenttempsreal.md, tasca 1)
 Route::get('/health/redis', function () {
@@ -165,7 +170,6 @@ Route::get('/sesiones/{id}/asientos', function (Request $request, $id) {
 });
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/usuari', [AuthController::class, 'usuari']);
     Route::get('/entrades', [EntradaController::class, 'indexAutenticat']);
     Route::get('/usuaris/{usuariId}/entrades', [EntradaController::class, 'indexPerUsuari']);
@@ -174,6 +178,22 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/admin/panell-temps-real', [AdminInformesController::class, 'panellTempsReal']);
     Route::get('/admin/informes-resum', [AdminInformesController::class, 'informesResum']);
+
+    /** OMDb: importació de metadades (clau OMDB_API_KEY només al servidor) */
+    Route::get('/admin/omdb/search', [AdminOmdbController::class, 'search']);
+    Route::get('/admin/omdb', [AdminOmdbController::class, 'show']);
+
+    /** JSON (OMDb o intern) → INSERT a `pelis` */
+    Route::post('/admin/peliculas/import', [AdminPeliculaImportController::class, 'store']);
+
+    /** OMDb API → INSERT directe a `pelis` (imdb_ids al cos JSON) */
+    Route::post('/admin/peliculas/fetch-omdb', [AdminOmdbImportarController::class, 'store']);
+
+    /** OMDb: cerca per títol i importa fins a N pel·lícules */
+    Route::post('/admin/peliculas/fetch-omdb-cerca', [AdminOmdbImportarController::class, 'importarDesCerca']);
+
+    /** OMDb: importa fins a 25 pel·lícules des de config/omdb.php (llista recomanada) */
+    Route::post('/admin/peliculas/fetch-omdb-demo', [AdminOmdbImportarController::class, 'importarDemo']);
 
     // Rutes Admin - CRUD Pel·lícules
     Route::post('/peliculas', function (Illuminate\Http\Request $request) {
