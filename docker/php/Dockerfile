@@ -1,0 +1,33 @@
+FROM php:8.4-fpm-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    git \
+    curl \
+    libpng-dev \
+    oniguruma-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    postgresql-dev \
+    postgresql-client \
+    netcat-openbsd
+
+# Install PHP extensions
+RUN docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd
+
+# Composer: instal·lació oficial (evita `COPY --from=composer:latest`, que depèn d’una segona imatge i sovint falla amb la CDN de Docker Hub / xarxa).
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
+    && chmod +x /usr/local/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+
+# Script d'arrencada (CRLF de Windows trenca exec: normalitzar i invocar amb sh)
+COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/bin/sh", "/usr/local/bin/entrypoint.sh"]
+
+# Expose port 9000
+EXPOSE 9000
