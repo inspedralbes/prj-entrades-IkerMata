@@ -47,3 +47,6 @@ backend-laravel/storage/logs/*
 
 # Docker
 docker/data
+
+# Documentació local (vídeos massa grans per a GitHub; límit 100 MB)
+doc/*.mp4
