@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Desenvolupament guiat per especificació (OpenSpec) amb suport d’IA</title>
+  <style>
+    body { font-family: Georgia, "Times New Roman", serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; border-bottom: 1px solid #ccc; padding-bottom: 0.35rem; }
+    h2 { font-size: 1.2rem; margin-top: 1.5rem; }
+    p { margin: 0.65rem 0; }
+    ul { margin: 0.5rem 0 0.5rem 1.2rem; }
+    .meta { color: #555; font-size: 0.95rem; margin-bottom: 1.5rem; }
+    @media print { body { margin: 0; max-width: none; } }
+  </style>
+</head>
+<body>
+  <p class="meta"><strong>Iker Mata García</strong> · 2026 · Metodologia SDD + IA (OpenSpec)</p>
+
+  <h1>Desenvolupament guiat per especificació (OpenSpec) amb suport d’IA</h1>
+  <p><em>Sincronització de l’estat inicial de butaques amb reserves temporals</em></p>
+
+  <h2>1. Explicació de la funcionalitat</h2>
+  <p>La pantalla de selecció de butaques carrega la graella de seients mitjançant una petició HTTP a l’API (Laravel) i, en paral·lel, es connecta al canal de temps real (Socket.io via gateway) per rebre canvis sobre reserves temporals d’altres usuaris.</p>
+  <p><strong>Problema abans del canvi:</strong> el camp que indica que un seient està ocupat temporalment per una altra persona (<code>seleccionat_per_altre</code>) només s’actualitzava quan arribaven esdeveniments nous pel socket. Qualsevol usuari que recarregués la pàgina o entrés tard no rebia esdeveniments passats i veia seients com a disponibles quan ja hi havia una reserva temporal activa.</p>
+  <p><strong>Solució implementada:</strong> l’endpoint que retorna els seients d’una sessió ara inclou, per a cada seient, informació derivada de les reserves temporals no caducades: <code>seleccionat_per_altre</code>, <code>la_meva_reserva</code> (quan hi ha token vàlid i la reserva és pròpia) i, si escau, <code>meva_expiracio_iso</code>. El socket segueix sent la font d’actualitzacions incrementals després de la primera càrrega.</p>
+
+  <h2>2. Procés seguit amb la IA</h2>
+  <ol>
+    <li><strong>Definició amb OpenSpec (<code>opsx:propose</code>):</strong> canvi <code>sincronitzacio-estat-butaques-inicial</code> amb <code>proposal.md</code>, <code>design.md</code>, capability <code>session-seats-initial-state</code> amb <code>spec.md</code>, i <code>tasks.md</code>.</li>
+    <li><strong>Implementació guiada (<code>opsx:apply</code>):</strong> backend (consulta de <code>ReservaTemporal</code>, classe <code>SeientTemporalEstat</code>, integració a la ruta d’asientos, proves), frontend (store Pinia i butaques).</li>
+    <li><strong>Iteració controlada:</strong> correccions referides a l’spec i als tests.</li>
+  </ol>
+  <p>El detall de prompts figura a <code>docs/prompts-log.md</code>.</p>
+
+  <h2>3. Principals problemes trobats</h2>
+  <ul>
+    <li>Casos límit: seient ja venut no ha de mostrar conflicte de reserva temporal als flags.</li>
+    <li>Autenticació opcional: comportament explícit sense token.</li>
+    <li>Ordre d’esdeveniments: socket abans que la llista HTTP estigui carregada (cua al frontend).</li>
+  </ul>
+
+  <h2>4. Decisions preses (prompts vs especificació)</h2>
+  <p>L’objectiu de l’spec es va mantenir; els refinaments van ser sobretot a prompts i codi, més proves. Redis es va deixar com a opcional (primera iteració sense cache).</p>
+
+  <h2>5. Valoració crítica</h2>
+  <p><strong>Ha seguit l’agent l’especificació?</strong> En conjunt sí; els requisits tenen correspondència al codi. La part HTTP/socket va caldre explicitar al prompt.</p>
+  <p><strong>Iteracions:</strong> de l’ordre de dues a tres voltes de refinament després del primer esborrany.</p>
+  <p><strong>On falla més la IA?</strong> Interpretació de casos límit i supòsits implícits; execució millor amb proves automàtiques; coherència client/servidor cal guiar-la amb tasques i fitxers concrets.</p>
+  <p><strong>Especificació vs prompts:</strong> es va ajustar poc l’spec conceptual; sobretot prompts i implementació.</p>
+
+  <h2>6. Conclusió</h2>
+  <p>OpenSpec ancora el treball de l’agent a requisits verificables. La traçabilitat a <code>docs/prompts-log.md</code> és l’evidència de procés que complementa el resultat funcional.</p>
+
+  <p class="meta" style="margin-top:2rem;"><em>Per generar el PDF: obre aquest fitxer al navegador → Imprimir → Desar com a PDF.</em></p>
+</body>
+</html>

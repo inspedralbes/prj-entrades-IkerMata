@@ -1,0 +1,184 @@
+services:
+  # Nuxt 3 Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ticket-frontend
+    ports:
+      - "3002:3000"
+    volumes:
+      - ./frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      # Des del navegador cal la IP o domini del servidor (no localhost) en desplegament. Definir a .env a l'arrel:
+      # NUXT_PUBLIC_API_BASE=http://IP:8001/api
+      # NUXT_PUBLIC_GATEWAY_URL=http://IP:3003
+      - GATEWAY_URL=${NUXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
+      - NUXT_PUBLIC_API_BASE=${NUXT_PUBLIC_API_BASE:-http://localhost:3003/api}
+      - NUXT_PUBLIC_GATEWAY_URL=${NUXT_PUBLIC_GATEWAY_URL:-http://localhost:3003}
+      # SSR dins Docker: no usar localhost:8001; Nginx Laravel al servei «web» (port 80 intern).
+      - NUXT_API_INTERNAL_BASE=${NUXT_API_INTERNAL_BASE:-http://web/api}
+    networks:
+      - ticket-net
+    depends_on:
+      - gateway
+
+  # Node.js Gateway
+  gateway:
+    build:
+      context: ./backend-node
+      dockerfile: Dockerfile
+    container_name: ticket-gateway
+    ports:
+      - "3003:3001"
+    volumes:
+      - ./backend-node:/usr/src/app
+      # Volum anomenat: si falten dependències (p. ex. ioredis), eliminar amb:
+      # docker compose down && docker volume rm prj-entrades-ikermata_gateway_node_modules
+      - gateway_node_modules:/usr/src/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - LARAVEL_API_URL=http://web/api
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - ticket-net
+    depends_on:
+      - web
+      - redis
+
+  # Laravel Application (PHP-FPM)
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ticket-app
+    volumes:
+      - ./backend-laravel:/var/www
+      - ./base_de_dades/sql:/docker-entrypoint-initdb.d
+    environment:
+      # Dins Docker el Postgres és el servei `db`, no 127.0.0.1 (això sobreescriu DB_HOST del .env si està malament).
+      # DB_CONNECTION per defecte a config/database.php és sqlite; sense això Laravel intenta database.sqlite i petarà.
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=secret
+      - CACHE_STORE=file
+      - SESSION_DRIVER=file
+      - REDIS_HOST=redis
+      - REDIS_CLIENT=predis
+      # Mateix canal Redis pub/sub que el gateway (sense prefix per defecte de Laravel)
+      - REDIS_PREFIX=
+      # OMDb (opcional): definir també a backend-laravel/.env o aquí
+      - OMDB_API_KEY=${OMDB_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 90s
+    networks:
+      - ticket-net
+    depends_on:
+      - db
+      - redis
+
+  # Planificador Laravel (caducitat reserves temporals → Redis / Socket.io)
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ticket-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./backend-laravel:/var/www
+    entrypoint: ['php', 'artisan', 'schedule:work']
+    environment:
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=laravel
+      - DB_USERNAME=laravel
+      - DB_PASSWORD=secret
+      - CACHE_STORE=file
+      - SESSION_DRIVER=file
+      - REDIS_HOST=redis
+      - REDIS_CLIENT=predis
+      - REDIS_PREFIX=
+    networks:
+      - ticket-net
+    depends_on:
+      app:
+        condition: service_healthy
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+
+  # Nginx Web Server for Laravel
+  web:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    container_name: ticket-web
+    ports:
+      - "8001:80"
+    volumes:
+      - ./backend-laravel:/var/www
+    networks:
+      - ticket-net
+    depends_on:
+      app:
+        condition: service_healthy
+
+  # Redis (temps real / cues; Laravel + Node)
+  redis:
+    image: redis:7-alpine
+    container_name: ticket-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - ticket-net
+    volumes:
+      - redis_data:/data
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    container_name: ticket-db
+    restart: always
+    environment:
+      - POSTGRES_DB=laravel
+      - POSTGRES_USER=laravel
+      - POSTGRES_PASSWORD=secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./base_de_dades/sql:/docker-entrypoint-initdb.d
+    networks:
+      - ticket-net
+
+  # Adminer
+  adminer:
+    image: adminer
+    container_name: ticket-adminer
+    ports:
+      - "8081:8080"
+    networks:
+      - ticket-net
+
+networks:
+  ticket-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  gateway_node_modules:
